@@ -1,10 +1,9 @@
 #include "raylib.h"
 #include "stdio.h"
 #include "time.h"
-// #include "stdlib.h"
 
-#define width 80
-#define height 90
+#define width 100
+#define height 100
 
 #define queue_lenth 200
 
@@ -93,6 +92,38 @@ void flood_remove(int x, int y){
     queue.next_empty = 0;
 }
 
+void add_hardrock(){
+    for(int x = 0; x < width; x++){
+        for(int y = 0; y < height; y++){
+
+            if(map1[x][y] == 0){
+                continue;
+            }
+
+            int deap = 1;
+            for(int x_off = -3; x_off < 4; x_off++){
+                for(int y_off = -3; y_off < 4; y_off++){
+
+                    if(x + x_off < 0 || x + x_off >= width || y + y_off < 0 || y + y_off >= height){
+                        continue;
+                    }else if(map1[x + x_off][y + y_off] == 0){
+                        deap = 0;
+                        goto next;
+                    }
+
+                }
+            }
+
+            next:;
+
+            if(deap){
+                map1[x][y] = 2;
+            }
+
+        }
+    }
+}
+
 void map_gen(){
     for(int x = 0; x < width; x++){
         for(int y = 0; y < height; y++){
@@ -161,6 +192,9 @@ void map_gen(){
     for(int i = 0; i < remove; i++){
         flood_remove(remove_x[i], remove_y[i]);
     }
+
+    add_hardrock();
+
 }
 
 int main(){
@@ -178,11 +212,18 @@ int main(){
     for(int y = 0; y < height; y++){
         printf("y = %2d:", y);
         for(int x = 0; x < width; x++){
-            if(map1[x][y] == 1){
-                printf(" # ");
-            }else{
-                printf("   ");
+            switch(map1[x][y]){
+                case 0:
+                    printf("   ");
+                    break;
+                case 1:
+                    printf(" # ");
+                    break;
+                case 2:
+                    printf(" & ");
+                    break;
             }
+
         }
         printf("\n");
     }
