@@ -2,8 +2,8 @@
 #include "stdio.h"
 #include "time.h"
 
-#define width 100
-#define height 100
+#define width 70
+#define height 70
 
 #define queue_lenth 200
 
@@ -19,7 +19,6 @@ typedef struct{
 
 int map1[width][height];
 int map2[width][height];
-int map3[width][height];
 
 int spatern_x[] = {-1,  1,  0,  0, -1,  1, -1,  1};
 int spatern_y[] = { 0,  0, -1,  1, -1, -1,  1,  1};
@@ -31,7 +30,7 @@ queue_t queue = {
 };
 
 
-int flood_search(int x, int y){
+int flood_search(int x, int y, int marker){
     int area = 1;
     queue.queue_x[0] = x;
     queue.queue_y[0] = y;
@@ -39,8 +38,8 @@ int flood_search(int x, int y){
     map2[x][y] = 1;
     while(queue.curent != queue.next_empty){
         for(int i = 0; i < search_cross; i++){
-            if(map1[queue.queue_x[queue.curent] + spatern_x[i]][queue.queue_y[queue.curent] + spatern_y[i]] == 0 && map2[queue.queue_x[queue.curent] + spatern_x[i]][queue.queue_y[queue.curent] + spatern_y[i]] != 1){
-                map2[queue.queue_x[queue.curent] + spatern_x[i]][queue.queue_y[queue.curent] + spatern_y[i]] = 1;
+            if(map1[queue.queue_x[queue.curent] + spatern_x[i]][queue.queue_y[queue.curent] + spatern_y[i]] == 0 && map2[queue.queue_x[queue.curent] + spatern_x[i]][queue.queue_y[queue.curent] + spatern_y[i]] != marker){
+                map2[queue.queue_x[queue.curent] + spatern_x[i]][queue.queue_y[queue.curent] + spatern_y[i]] = marker;
                 area++;
                 queue.queue_x[queue.next_empty] = queue.queue_x[queue.curent] + spatern_x[i];
                 queue.queue_y[queue.next_empty] = queue.queue_y[queue.curent] + spatern_y[i];
@@ -124,7 +123,7 @@ void add_hardrock(){
     }
 }
 
-void map_gen(){
+void cave_gen(){
     for(int x = 0; x < width; x++){
         for(int y = 0; y < height; y++){
             int temp = GetRandomValue(1, 100);
@@ -179,7 +178,7 @@ void map_gen(){
     for(int x = 0; x < width; x++){
         for(int y = 0; y < height; y++){
             if(map1[x][y] == 0 && map2[x][y] != 1){
-                int area = flood_search(x, y);
+                int area = flood_search(x, y, 1);
                 if(area < 11){
                     remove_x[remove] = x;
                     remove_y[remove] = y;
@@ -196,6 +195,120 @@ void map_gen(){
     add_hardrock();
 
 }
+
+void coredor_gen(int from_x, int from_y, int to_x, int to_y){
+
+    int moledir_x = to_x - from_x;
+    int moledir_y = to_y - from_y;
+
+    if(moledir_x < 0){
+        moledir_x = -1;
+    }else if(moledir_x > 0){
+        moledir_x = 1;
+    }
+
+    if(moledir_y < 0){
+        moledir_y = -1;
+    }else if(moledir_y > 0){
+        moledir_y = 1;
+    }
+
+    while(from_x != to_x){
+        from_x += moledir_x;
+        map1[from_x][from_y] = 0;
+    }
+    while(from_y != to_y){
+        from_y += moledir_y;
+        map1[from_x][from_y] = 0;
+    }
+}
+
+void dungeon_gen(){
+    for(int x = 0; x <width + 1; x++){
+        for(int y = 0; y <height + 1 ; y++){
+            map1[x][y] = 1;
+        }
+    }
+
+
+    int rooms_x[10];
+    int rooms_y[10];
+    int rooms = 0;
+
+    int attempts = 0;
+    while(rooms < 10){
+        int room_width = GetRandomValue(5, 15);
+        int room_height = GetRandomValue(5, 15);
+        int room_x = GetRandomValue(1, width - 1);
+        int room_y = GetRandomValue(1, height - 1);
+
+        int clear = 1;
+
+        for(int x = -1; x < room_width + 1; x++){
+            for(int y = -1; y < room_height + 1; y++){
+                if(map1[room_x + x][room_y + y] == 0 || room_x + x < 0 || room_x + x >= width || room_y + y < 0 || room_y + y >= height){
+                    clear = 0;
+                    attempts++;
+                    goto exit;
+                }
+            }
+        }
+        exit:;
+
+        if(attempts == 10){
+            break;
+        }
+        if(!clear){
+            continue;
+        }
+
+        rooms_x[rooms] = room_x + (int)(room_width / 2);
+        rooms_y[rooms] = room_y + (int)(room_height / 2);
+
+        for(int x = 0; x < room_width; x++){
+            for(int y = 0; y < room_height; y++){
+                map1[room_x + x][room_y + y] = 0;
+            }
+        }
+        rooms++;
+        attempts = 0;
+    }
+
+    for(int i = 0; i < rooms - 1; i++){
+        int room1 = GetRandomValue(0, rooms - 1);
+        int room2;
+        while((room2 = GetRandomValue(0, rooms - 1)) == room1);
+
+        coredor_gen(rooms_x[room1], rooms_y[room1], rooms_x[room2], rooms_y[room2]);
+    }
+
+    int areas = 0;
+    while(areas != 1){
+        areas = 0;
+        for(int x = 0; x < width; x++){
+            for(int y = 0; y < height; y++){
+                if(map1[x][y] == 0 && map2[x][y] == 0){
+                    areas++;
+                    flood_search(x, y, areas);
+                }
+            }
+        }
+
+        int room1 = GetRandomValue(0, rooms - 1);
+        int room2;
+        while((room2 = GetRandomValue(0, rooms - 1)) == room1);
+
+        if(map2[rooms_x[room1]][rooms_y[room1]] != map2[rooms_x[room2]][rooms_y[room2]]){
+            coredor_gen(rooms_x[room1], rooms_y[room2], rooms_x[room2], rooms_y[room2]);
+        }
+    }
+
+}
+
+void map_gen(){
+    dungeon_gen();
+}
+
 
 int main(){
 
