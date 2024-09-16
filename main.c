@@ -1,14 +1,16 @@
 #include "raylib.h"
 #include "stdio.h"
 #include "time.h"
+#include "locale.h"
+#include "wchar.h"
 
-#define width 70
-#define height 70
+#define width 100
+#define height 100
 
 #define queue_lenth 200
 
 #define search_cross 4
-#define seatch_full 8
+#define search_full 8
 
 typedef struct{
     int curent;
@@ -22,6 +24,9 @@ int map2[width][height];
 
 int spatern_x[] = {-1,  1,  0,  0, -1,  1, -1,  1};
 int spatern_y[] = { 0,  0, -1,  1, -1, -1,  1,  1};
+
+int wallchar[] = {0x256c, 0x2550, 0x2550, 0x2550, 0x2551, 0x255d, 0x255a, 0x2569, 0x2551, 0x2557, 0x2554, 0x2566, 0x2551, 0x2563, 0x2560, 0x256c};
+
 
 
 queue_t queue = {
@@ -140,7 +145,7 @@ void cave_gen(){
             for(int y = 0; y < height; y++){
 
                 int neighbors = 0;
-                for(int i = 0; i < seatch_full; i++){
+                for(int i = 0; i < search_full; i++){
                     if(x + spatern_x[i] < 0 || x + spatern_x[i] >= width || y + spatern_y[i] < 0 || y + spatern_y[i] >= height){
                         neighbors++;
                     }else if(map1[x + spatern_x[i]][y + spatern_y[i]]){
@@ -216,10 +221,21 @@ void coredor_gen(int from_x, int from_y, int to_x, int to_y){
     while(from_x != to_x){
         from_x += moledir_x;
         map1[from_x][from_y] = 0;
+        for(int i = 0; i < search_full; i++){
+            if(map1[from_x + spatern_x[i]][from_y + spatern_y[i]] == 1){
+                map1[from_x + spatern_x[i]][from_y + spatern_y[i]] = 3;
+            }
+        }
     }
+
     while(from_y != to_y){
         from_y += moledir_y;
         map1[from_x][from_y] = 0;
+        for(int i = 0; i < search_full; i++){
+            if(map1[from_x + spatern_x[i]][from_y + spatern_y[i]] == 1){
+                map1[from_x + spatern_x[i]][from_y + spatern_y[i]] = 3;
+            }
+        }
     }
 }
 
@@ -265,9 +281,12 @@ void dungeon_gen(){
         rooms_x[rooms] = room_x + (int)(room_width / 2);
         rooms_y[rooms] = room_y + (int)(room_height / 2);
 
-        for(int x = 0; x < room_width; x++){
-            for(int y = 0; y < room_height; y++){
+        for(int x = -1; x <= room_width; x++){
+            for(int y = -1; y <= room_height; y++){
                 map1[room_x + x][room_y + y] = 0;
+                if(x == -1 || x == room_width || y == -1 || y == room_height){
+                    map1[room_x + x][room_y + y] = 3;
+                }
             }
         }
         rooms++;
@@ -283,15 +302,17 @@ void dungeon_gen(){
     }
 
     int areas = 0;
-    while(areas != 1){
+    while(1){
         areas = 0;
-        for(int x = 0; x < width; x++){
-            for(int y = 0; y < height; y++){
-                if(map1[x][y] == 0 && map2[x][y] == 0){
-                    areas++;
-                    flood_search(x, y, areas);
-                }
+        for(int i = 0; i < rooms; i++){
+            if(map2[rooms_x[i]][rooms_y[i]] == 0){
+                areas++;
+                flood_search(rooms_x[i], rooms_y[i], areas);
             }
+        }
+
+        if(areas == 1){
+            break;
         }
 
         int room1 = GetRandomValue(0, rooms - 1);
@@ -299,8 +320,15 @@ void dungeon_gen(){
         while((room2 = GetRandomValue(0, rooms - 1)) == room1);
 
         if(map2[rooms_x[room1]][rooms_y[room1]] != map2[rooms_x[room2]][rooms_y[room2]]){
-            coredor_gen(rooms_x[room1], rooms_y[room2], rooms_x[room2], rooms_y[room2]);
+            coredor_gen(rooms_x[room1], rooms_y[room1], rooms_x[room2], rooms_y[room2]);
         }
+
+        for(int x = 0; x < width; x++){
+            for(int y = 0; y < height; y++){
+                map2[x][y] = 0;
+            }
+        }
+        
     }
 
 }
@@ -309,8 +337,35 @@ void map_gen(){
     dungeon_gen();
 }
 
+void draw_wall(int x, int y){
+    int type = 0;
+
+    for(int i = 0; i < search_cross; i++){
+        if(map1[x + spatern_x[i]][y + spatern_y[i]] == 3){
+            type |= 1 << i;
+        }
+    }
+
+    if(type & 1){
+        wprintf(L"%lc", wallchar[1]);
+    }else{
+        printf(" ");
+    }
+
+    wprintf(L"%lc", wallchar[type]);
+
+    if(type & 2){
+        wprintf(L"%lc", wallchar[1]);
+    }else{
+        printf(" ");
+    }
+    
+}
+
 
 int main(){
+
+    setlocale(LC_ALL, "en_US.UTF-8");
 
     SetRandomSeed(time(NULL));
 
@@ -334,6 +389,9 @@ int main(){
                     break;
                 case 2:
                     printf(" & ");
+                    break;
+                case 3:
+                    draw_wall(x, y);
                     break;
             }
 
