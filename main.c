@@ -12,6 +12,14 @@
 #define search_cross 4
 #define search_full 8
 
+typedef enum{
+    floor,
+    rock,
+    hardrock,
+    wall,
+    door,
+}tile_type;
+
 typedef struct{
     int curent;
     int next_empty;
@@ -43,7 +51,11 @@ int flood_search(int x, int y, int marker){
     map2[x][y] = 1;
     while(queue.curent != queue.next_empty){
         for(int i = 0; i < search_cross; i++){
-            if(map1[queue.queue_x[queue.curent] + spatern_x[i]][queue.queue_y[queue.curent] + spatern_y[i]] == 0 && map2[queue.queue_x[queue.curent] + spatern_x[i]][queue.queue_y[queue.curent] + spatern_y[i]] != marker){
+            if((
+                map1[queue.queue_x[queue.curent] + spatern_x[i]][queue.queue_y[queue.curent] + spatern_y[i]] == floor || 
+                map1[queue.queue_x[queue.curent] + spatern_x[i]][queue.queue_y[queue.curent] + spatern_y[i]] == door) && 
+                map2[queue.queue_x[queue.curent] + spatern_x[i]][queue.queue_y[queue.curent] + spatern_y[i]] != marker
+            ){
                 map2[queue.queue_x[queue.curent] + spatern_x[i]][queue.queue_y[queue.curent] + spatern_y[i]] = marker;
                 area++;
                 queue.queue_x[queue.next_empty] = queue.queue_x[queue.curent] + spatern_x[i];
@@ -74,7 +86,7 @@ void flood_remove(int x, int y){
     map1[x][y] = 1;
     while(queue.curent != queue.next_empty){
         for(int i = 0; i < search_cross; i++){
-            if(map1[queue.queue_x[queue.curent] + spatern_x[i]][queue.queue_y[queue.curent] + spatern_y[i]] == 0){
+            if(map1[queue.queue_x[queue.curent] + spatern_x[i]][queue.queue_y[queue.curent] + spatern_y[i]] == floor){
                 map1[queue.queue_x[queue.curent] + spatern_x[i]][queue.queue_y[queue.curent] + spatern_y[i]] = 1;
                 queue.queue_x[queue.next_empty] = queue.queue_x[queue.curent] + spatern_x[i];
                 queue.queue_y[queue.next_empty] = queue.queue_y[queue.curent] + spatern_y[i];
@@ -110,7 +122,7 @@ void add_hardrock(){
 
                     if(x + x_off < 0 || x + x_off >= width || y + y_off < 0 || y + y_off >= height){
                         continue;
-                    }else if(map1[x + x_off][y + y_off] == 0){
+                    }else if(map1[x + x_off][y + y_off] == floor){
                         deap = 0;
                         goto next;
                     }
@@ -121,7 +133,7 @@ void add_hardrock(){
             next:;
 
             if(deap){
-                map1[x][y] = 2;
+                map1[x][y] = hardrock;
             }
 
         }
@@ -133,9 +145,9 @@ void cave_gen(){
         for(int y = 0; y < height; y++){
             int temp = GetRandomValue(1, 100);
             if(temp >= 70){
-                map1[x][y] = 1;
+                map1[x][y] = rock;
             }else{
-                map1[x][y] = 0;
+                map1[x][y] = floor;
             }
         }
     }
@@ -153,11 +165,11 @@ void cave_gen(){
                     }
                 }
                 if(neighbors >= 4){
-                    map2[x][y] = 1;
+                    map2[x][y] = rock;
                 }else if(neighbors == 3){
                     map2[x][y] = map1[x][y];
                 }else{
-                    map2[x][y] = 0;
+                    map2[x][y] = floor;
                 }
 
             }
@@ -218,22 +230,28 @@ void coredor_gen(int from_x, int from_y, int to_x, int to_y){
         moledir_y = 1;
     }
 
-    while(from_x != to_x){
-        from_x += moledir_x;
-        map1[from_x][from_y] = 0;
-        for(int i = 0; i < search_full; i++){
-            if(map1[from_x + spatern_x[i]][from_y + spatern_y[i]] == 1){
-                map1[from_x + spatern_x[i]][from_y + spatern_y[i]] = 3;
-            }
+    int olde_x = from_x;
+    int olde_y = from_y;
+    while(from_x != to_x || from_y != to_y){
+        int oldest_x = olde_x;
+        int oldest_y = olde_y;
+        olde_x = from_x;
+        olde_y = from_y;
+        if(from_x != to_x){
+            from_x += moledir_x;
+        } else{
+            from_y += moledir_y;
         }
-    }
 
-    while(from_y != to_y){
-        from_y += moledir_y;
-        map1[from_x][from_y] = 0;
+        if(map1[from_x][from_y] == wall || map1[from_x][from_y] == door){
+            map1[from_x][from_y] = door;
+        }else{
+            map1[from_x][from_y] = floor;
+        }
+
         for(int i = 0; i < search_full; i++){
-            if(map1[from_x + spatern_x[i]][from_y + spatern_y[i]] == 1){
-                map1[from_x + spatern_x[i]][from_y + spatern_y[i]] = 3;
+            if(map1[oldest_x + spatern_x[i]][oldest_y + spatern_y[i]] == rock){
+                map1[oldest_x + spatern_x[i]][oldest_y + spatern_y[i]] = wall;
             }
         }
     }
@@ -283,9 +301,9 @@ void dungeon_gen(){
 
         for(int x = -1; x <= room_width; x++){
             for(int y = -1; y <= room_height; y++){
-                map1[room_x + x][room_y + y] = 0;
+                map1[room_x + x][room_y + y] = floor;
                 if(x == -1 || x == room_width || y == -1 || y == room_height){
-                    map1[room_x + x][room_y + y] = 3;
+                    map1[room_x + x][room_y + y] = wall;
                 }
             }
         }
@@ -328,8 +346,22 @@ void dungeon_gen(){
                 map2[x][y] = 0;
             }
         }
-        
     }
+
+    for(int x = 0; x < width; x++){
+        for(int y = 0; y < height; y++){
+            if(map1[x][y] == door){
+                if( (map1[x + spatern_x[0]][y + spatern_y[0]] == wall && map1[x + spatern_x[1]][y + spatern_y[1]] == wall) || 
+                    (map1[x + spatern_x[2]][y + spatern_y[2]] == wall && map1[x + spatern_x[3]][y + spatern_y[3]] == wall)
+                ){
+                    map1[x][y] = door;
+                }else{
+                    map1[x][y] = floor;
+                }
+            }
+        }
+    }
+    
 
 }
 
@@ -341,7 +373,7 @@ void draw_wall(int x, int y){
     int type = 0;
 
     for(int i = 0; i < search_cross; i++){
-        if(map1[x + spatern_x[i]][y + spatern_y[i]] == 3){
+        if(map1[x + spatern_x[i]][y + spatern_y[i]] == wall || map1[x + spatern_x[i]][y + spatern_y[i]] == door){
             type |= 1 << i;
         }
     }
@@ -381,17 +413,20 @@ int main(){
         printf("y = %2d:", y);
         for(int x = 0; x < width; x++){
             switch(map1[x][y]){
-                case 0:
+                case floor:
                     printf("   ");
                     break;
-                case 1:
+                case rock:
                     printf(" # ");
                     break;
-                case 2:
+                case hardrock:
                     printf(" & ");
                     break;
-                case 3:
+                case wall:
                     draw_wall(x, y);
+                    break;
+                case door:
+                    printf(" D ");
                     break;
             }
 
