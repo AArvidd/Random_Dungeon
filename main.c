@@ -1,4 +1,4 @@
-#include "raylib.h"
+#include "stdlib.h"
 #include "stdio.h"
 #include "time.h"
 #include "locale.h"
@@ -143,7 +143,7 @@ void add_hardrock(){
 void cave_gen(){
     for(int x = 0; x < width; x++){
         for(int y = 0; y < height; y++){
-            int temp = GetRandomValue(1, 100);
+            int temp = (rand() % 100) + 1;
             if(temp >= 70){
                 map1[x][y] = rock;
             }else{
@@ -264,17 +264,19 @@ void dungeon_gen(){
         }
     }
 
+    int max_rooms = 10;
 
-    int rooms_x[10];
-    int rooms_y[10];
+
+    int rooms_x[max_rooms];
+    int rooms_y[max_rooms];
     int rooms = 0;
 
     int attempts = 0;
-    while(rooms < 10){
-        int room_width = GetRandomValue(5, 15);
-        int room_height = GetRandomValue(5, 15);
-        int room_x = GetRandomValue(1, width - 1);
-        int room_y = GetRandomValue(1, height - 1);
+    while(rooms < max_rooms){
+        int room_width = (rand() % 11) + 5;
+        int room_height = (rand() % 11) + 5;
+        int room_x = (rand() % width - 1) + 1;
+        int room_y = (rand() % height - 1) + 1;
 
         int clear = 1;
 
@@ -312,9 +314,9 @@ void dungeon_gen(){
     }
 
     for(int i = 0; i < rooms - 1; i++){
-        int room1 = GetRandomValue(0, rooms - 1);
+        int room1 = rand() % rooms;
         int room2;
-        while((room2 = GetRandomValue(0, rooms - 1)) == room1);
+        while((room2 = rand() % rooms) == room1);
 
         coredor_gen(rooms_x[room1], rooms_y[room1], rooms_x[room2], rooms_y[room2]);
     }
@@ -333,9 +335,9 @@ void dungeon_gen(){
             break;
         }
 
-        int room1 = GetRandomValue(0, rooms - 1);
+        int room1 = rand() % rooms;
         int room2;
-        while((room2 = GetRandomValue(0, rooms - 1)) == room1);
+        while((room2 = rand() % rooms) == room1);
 
         if(map2[rooms_x[room1]][rooms_y[room1]] != map2[rooms_x[room2]][rooms_y[room2]]){
             coredor_gen(rooms_x[room1], rooms_y[room1], rooms_x[room2], rooms_y[room2]);
@@ -399,7 +401,7 @@ int main(){
 
     setlocale(LC_ALL, "en_US.UTF-8");
 
-    SetRandomSeed(time(NULL));
+    srand(time(NULL));
 
     map_gen();
 
