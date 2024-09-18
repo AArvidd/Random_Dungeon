@@ -4,8 +4,11 @@
 #include "locale.h"
 #include "wchar.h"
 
+#include "termios.h"
+#include "unistd.h"
+
 #define width 100
-#define height 100
+#define height 50
 
 #define queue_lenth 200
 
@@ -27,8 +30,27 @@ typedef struct{
     int queue_y[queue_lenth];
 }queue_t;
 
+typedef struct{
+    int exits_x[4];
+    int exits_y[4];
+    int gentype;
+    int sead;
+}world_tile_t;
+
+typedef struct{
+    int x;
+    int y;
+}player_t;
+
 int map1[width][height];
 int map2[width][height];
+
+int world_pos_x = 0;
+int world_pos_y = 0;
+
+world_tile_t world_map[50][50];
+
+player_t player;
 
 int spatern_x[] = {-1,  1,  0,  0, -1,  1, -1,  1};
 int spatern_y[] = { 0,  0, -1,  1, -1, -1,  1,  1};
@@ -363,12 +385,81 @@ void dungeon_gen(){
             }
         }
     }
-    
+    add_hardrock();
 
 }
 
 void map_gen(){
-    dungeon_gen();
+    if(world_map[world_pos_x][world_pos_y].sead == 0){
+        world_map[world_pos_x][world_pos_y].sead = time(NULL);
+    }
+    srand(world_map[world_pos_x][world_pos_y].sead);
+    if(rand() % 2){
+        dungeon_gen();
+    }else{
+        cave_gen();
+    }
+}
+
+
+void plase_player(){
+    player.x = rand() % width;
+    player.y = rand() % height;
+    while(map1[player.x][player.y] != 0){
+        player.x = rand() % width;
+        player.y = rand() % height;    
+    }
+}
+
+int move_player(){
+    char c;
+    int olde_x = player.x;
+    int olde_y = player.y;
+    //while((c = getchar()) == '\n');
+    c = getchar();
+    printf("\x1b[F \b");
+    switch(c){
+        case 'w':
+        case 'W':
+            if( map1[player.x][player.y - 1] == floor ||
+                map1[player.x][player.y - 1] == door
+            ){
+                player.y--;
+            }
+            break;
+        
+        case 's':
+        case 'S':
+            if( map1[player.x][player.y + 1] == floor ||
+                map1[player.x][player.y + 1] == door
+            ){
+                player.y++;
+            }
+            break;
+        
+        case 'a':
+        case 'A':
+            if( map1[player.x - 1][player.y] == floor ||
+                map1[player.x - 1][player.y] == door
+            ){
+                player.x--;
+            }
+            break;
+        
+        case 'd':
+        case 'D':
+            if( map1[player.x + 1][player.y] == floor ||
+                map1[player.x + 1][player.y] == door
+            ){
+                player.x++;
+            }
+            break;
+        case 'e':
+        case 'E':
+         return 1;
+    }
+
+    return 0;
 }
 
 void draw_wall(int x, int y){
@@ -396,15 +487,7 @@ void draw_wall(int x, int y){
     
 }
 
-
-int main(){
-
-    setlocale(LC_ALL, "en_US.UTF-8");
-
-    srand(time(NULL));
-
-    map_gen();
-
+void draw_map(){
     printf("       ");
     for(int x = 0; x < width; x++){
         printf("%2d ", x);
@@ -414,6 +497,10 @@ int main(){
     for(int y = 0; y < height; y++){
         printf("y = %2d:", y);
         for(int x = 0; x < width; x++){
+            if(x == player.x && y == player.y){
+                printf(" \x1b[32m@\x1b[0m ");
+                continue;
+            }
             switch(map1[x][y]){
                 case floor:
                     printf("   ");
@@ -435,6 +522,38 @@ int main(){
         }
         printf("\n");
     }
+}
+
+
+int main(){
+    printf("\x1b[?1049h");
+
+    static struct termios oldt, newt;
+
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ICANON);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+
+    setlocale(LC_ALL, "en_US.UTF-8");
+
+    map_gen();
+
+    plase_player();
+
+    // draw_map();
+
+    while(1){
+        printf("\x1b[f");
+        draw_map();
+        if(move_player()){
+            break;
+        }
+    }
+
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+
+    printf("\x1b[?1049l");
 
     return 0;
 }
