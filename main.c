@@ -3,7 +3,6 @@
 #include "time.h"
 #include "locale.h"
 #include "wchar.h"
-
 #include "termios.h"
 #include "unistd.h"
 
@@ -53,8 +52,8 @@ typedef struct{
 int map1[width][height];
 int map2[width][height];
 
-int world_pos_x = 0;
-int world_pos_y = 0;
+int world_pos_x = 5;
+int world_pos_y = 5;
 
 world_tile_t world_map[50][50];
 
@@ -241,6 +240,7 @@ void tunel_gen(int from_x, int from_y, int direction){
 }
 
 void cave_gen(int acces){
+    //initial sead
     for(int x = 0; x < width; x++){
         for(int y = 0; y < height; y++){
             int temp = (rand() % 100) + 1;
@@ -252,6 +252,7 @@ void cave_gen(int acces){
         }
     }
 
+    //seluar atatmeta
     for(int round = 0; round < 5; round++){
         for(int x = 0; x < width; x++){
             for(int y = 0; y < height; y++){
@@ -288,6 +289,7 @@ void cave_gen(int acces){
         }
     }
 
+    //remove too smale
     int remove_x[20];
     int remove_y[20];
     int remove = 0;
@@ -309,25 +311,34 @@ void cave_gen(int acces){
         flood_remove(remove_x[i], remove_y[i]);
     }
 
+    //exit tunels
     if(acces & 1 << 0){
         int exit = rand() % (width - 2) + 1;
         tunel_gen(exit, 0, down);
         map1[exit][0] = tile_exit;
+        world_map[world_pos_x][world_pos_y].exits_x[0] = exit;
+        world_map[world_pos_x][world_pos_y].exits_y[0] = 0;
     }
     if(acces & 1 << 1){
         int exit = rand() % (width - 2) + 1;
         tunel_gen(exit, height - 1, upp);
         map1[exit][height - 1] = tile_exit;
+        world_map[world_pos_x][world_pos_y].exits_x[1] = exit;
+        world_map[world_pos_x][world_pos_y].exits_y[1] = height - 1;
     }
     if(acces & 1 << 2){
         int exit = rand() % (height - 2) + 1;
         tunel_gen(0, exit, right);
         map1[0][exit] = tile_exit;
+        world_map[world_pos_x][world_pos_y].exits_x[2] = 0;
+        world_map[world_pos_x][world_pos_y].exits_y[2] = exit;
     }
     if(acces & 1 << 3){
-        int exit = rand() % (height - 2) + 1;
+        int exit = rand() % (height  - 2) + 1;
         tunel_gen(width - 1, exit, left);
         map1[width - 1][exit] = tile_exit;
+        world_map[world_pos_x][world_pos_y].exits_x[3] = width - 1;
+        world_map[world_pos_x][world_pos_y].exits_y[3] = exit;
     }
 
     add_hardrock();
@@ -336,6 +347,8 @@ void cave_gen(int acces){
 
 
 void dungeon_gen(int acces){
+    //room generation
+
     for(int x = 0; x <width + 1; x++){
         for(int y = 0; y <height + 1 ; y++){
             map1[x][y] = 1;
@@ -391,6 +404,8 @@ void dungeon_gen(int acces){
         attempts = 0;
     }
 
+    //coridor generation
+
     for(int i = 0; i < rooms - 1; i++){
         int room1 = rand() % rooms;
         int room2;
@@ -399,9 +414,8 @@ void dungeon_gen(int acces){
         coredor_gen(rooms_x[room1], rooms_y[room1], rooms_x[room2], rooms_y[room2]);
     }
 
-    int areas = 0;
     while(1){
-        areas = 0;
+        int areas = 0;
         for(int i = 0; i < rooms; i++){
             if(map2[rooms_x[i]][rooms_y[i]] == 0){
                 areas++;
@@ -428,12 +442,7 @@ void dungeon_gen(int acces){
         }
     }
 
-    for(int i = 0; i < search_cross; i++){
-        if(acces & 1 << i){
-            
-        }
-    }
-
+    //exit coredor gen
     if(acces & 1 << 0){
         int exit = rand() % width;
         int furthest = 0;
@@ -443,6 +452,10 @@ void dungeon_gen(int acces){
             }
         }
         coredor_gen(rooms_x[furthest], rooms_y[furthest], exit, 0);
+        map1[exit][0] = tile_exit;
+        world_map[world_pos_x][world_pos_y].exits_x[0] = exit;
+        world_map[world_pos_x][world_pos_y].exits_y[0] = 0;
+
     }
     if(acces & 1 << 1){
         int exit = rand() % width;
@@ -453,6 +466,9 @@ void dungeon_gen(int acces){
             }
         }
         coredor_gen(rooms_x[furthest], rooms_y[furthest], exit, height -1);
+        map1[exit][height - 1] = tile_exit;
+        world_map[world_pos_x][world_pos_y].exits_x[1] = exit;
+        world_map[world_pos_x][world_pos_y].exits_y[1] = height - 1;
     }
     if(acces & 1 << 2){
         int exit = rand() % width;
@@ -462,7 +478,10 @@ void dungeon_gen(int acces){
                 furthest = i;
             }
         }
-        coredor_gen(-1, exit, rooms_x[furthest], rooms_y[furthest]);
+        coredor_gen(0, exit, rooms_x[furthest], rooms_y[furthest]);
+        map1[0][exit] = tile_exit;
+        world_map[world_pos_x][world_pos_y].exits_x[2] = 0;
+        world_map[world_pos_x][world_pos_y].exits_y[2] = exit;
     }
     if(acces & 1 << 3){
         int exit = rand() % width;
@@ -472,7 +491,10 @@ void dungeon_gen(int acces){
                 furthest = i;
             }
         }
-        coredor_gen(width, exit, rooms_x[furthest], rooms_y[furthest]);
+        coredor_gen(width - 1, exit, rooms_x[furthest], rooms_y[furthest]);
+        map1[width - 1][exit] = tile_exit;
+        world_map[world_pos_x][world_pos_y].exits_x[3] = width - 1;
+        world_map[world_pos_x][world_pos_y].exits_y[3] = exit;
     }
 
     for(int x = 0; x < width; x++){
@@ -515,6 +537,7 @@ void plase_player(){
 }
 
 int move_player(){
+    //map movment
     int uppdate = 0;
     char c;
     int olde_x = player.x;
@@ -537,7 +560,7 @@ int move_player(){
         case 'S':
             if( map1[player.x][player.y + 1] == tile_floor ||
                 map1[player.x][player.y + 1] == tile_door  ||
-                map1[player.x][player.y - 1] == tile_exit
+                map1[player.x][player.y + 1] == tile_exit
             ){
                 player.y++;
                 uppdate = 1;
@@ -548,7 +571,7 @@ int move_player(){
         case 'A':
             if( map1[player.x - 1][player.y] == tile_floor ||
                 map1[player.x - 1][player.y] == tile_door  ||
-                map1[player.x][player.y - 1] == tile_exit
+                map1[player.x - 1][player.y] == tile_exit
             ){
                 player.x--;
                 uppdate = 1;
@@ -559,7 +582,7 @@ int move_player(){
         case 'D':
             if( map1[player.x + 1][player.y] == tile_floor ||
                 map1[player.x + 1][player.y] == tile_door  ||
-                map1[player.x][player.y - 1] == tile_exit
+                map1[player.x + 1][player.y] == tile_exit
             ){
                 player.x++;
                 uppdate = 1;
@@ -567,7 +590,28 @@ int move_player(){
             break;
         case 'e':
         case 'E':
-         return -1;
+            return -1;
+    }
+
+    //world movment
+    if(map1[player.x][player.y] == tile_exit){
+        int dir;
+        if(player.x == 0){
+            world_pos_x--;
+            dir = 3;
+        }else if(player.x == width - 1){
+            world_pos_x++;
+            dir = 2;
+        }else if(player.y == 0){
+            world_pos_y--;
+            dir = 1;
+        }else if(player.y == height - 1){
+            world_pos_y++;
+            dir = 0;
+        }
+        map_gen();
+        player.x = world_map[world_pos_x][world_pos_y].exits_x[dir];
+        player.y = world_map[world_pos_x][world_pos_y].exits_y[dir];
     }
 
     return uppdate;
@@ -628,13 +672,17 @@ void draw_map(){
                 case tile_door:
                     printf(" D ");
                     break;
-                default:
+                case tile_exit:
                     printf(" E ");
+                    break;
+                default:
+                    printf("???");
             }
 
         }
         printf("\n");
     }
+    //printf("world pos: %d, %d", world_pos_x, world_pos_y);
 }
 
 
