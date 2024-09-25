@@ -616,9 +616,10 @@ int move_player(){
     switch(c){
         case 'w':
         case 'W':
-            if( map1[player.x][player.y - 1] == tile_floor ||
+            if((map1[player.x][player.y - 1] == tile_floor ||
                 map1[player.x][player.y - 1] == tile_door  ||
-                map1[player.x][player.y - 1] == tile_exit
+                map1[player.x][player.y - 1] == tile_exit) &&
+                !(player.y - 1 < 0)
             ){
                 player.y--;
                 uppdate = 1;
@@ -627,9 +628,10 @@ int move_player(){
         
         case 's':
         case 'S':
-            if( map1[player.x][player.y + 1] == tile_floor ||
+            if((map1[player.x][player.y + 1] == tile_floor ||
                 map1[player.x][player.y + 1] == tile_door  ||
-                map1[player.x][player.y + 1] == tile_exit
+                map1[player.x][player.y + 1] == tile_exit) &&
+                !(player.y + 1 > width - 1)
             ){
                 player.y++;
                 uppdate = 1;
@@ -638,9 +640,10 @@ int move_player(){
         
         case 'a':
         case 'A':
-            if( map1[player.x - 1][player.y] == tile_floor ||
+            if((map1[player.x - 1][player.y] == tile_floor ||
                 map1[player.x - 1][player.y] == tile_door  ||
-                map1[player.x - 1][player.y] == tile_exit
+                map1[player.x - 1][player.y] == tile_exit) &&
+                !(player.x - 1 < 0)
             ){
                 player.x--;
                 uppdate = 1;
@@ -649,9 +652,10 @@ int move_player(){
         
         case 'd':
         case 'D':
-            if( map1[player.x + 1][player.y] == tile_floor ||
+            if((map1[player.x + 1][player.y] == tile_floor ||
                 map1[player.x + 1][player.y] == tile_door  ||
-                map1[player.x + 1][player.y] == tile_exit
+                map1[player.x + 1][player.y] == tile_exit) &&
+                !(player.x + 1 > height -1)
             ){
                 player.x++;
                 uppdate = 1;
