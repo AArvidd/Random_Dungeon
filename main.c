@@ -27,10 +27,10 @@ typedef enum{
 }tile_type;
 
 typedef enum{
-    upp,
-    down,
     left,
     right,
+    upp,
+    down,
 }direktions;
 
 typedef struct{
@@ -284,27 +284,10 @@ void coredor_gen(int from_x, int from_y, int to_x, int to_y){
 }
 
 void tunel_gen(int from_x, int from_y, int direction){
-    int dir_x = 0;
-    int dir_y = 0;
-
-    switch(direction){
-        case upp:
-            dir_y = -1;
-            break;
-        case down:
-            dir_y = 1;
-            break;
-        case left:
-            dir_x = -1;
-            break;
-        case right:
-            dir_x = 1;
-            break;
-    }
     while(map1[from_x][from_y] != tile_floor){
         map1[from_x][from_y] = tile_floor;
-        from_x += dir_x;
-        from_y += dir_y;
+        from_x += spatern_x[direction];
+        from_y += spatern_y[direction];
     }
 
 }
@@ -359,19 +342,41 @@ void cave_gen(int acces){
         }
     }
 
-    //remove too smale
+    //remove too smale / conect disconected arias
+    int search = 0;
+
     int remove_x[20];
     int remove_y[20];
     int remove = 0;
 
+    int keep_x[20];
+    int keep_y[20];
+    int keep = 0;
+
+    int largest = 0;
+    int largest_id = 0;
+    int largest_search = 0; 
+
     for(int x = 0; x < width; x++){
         for(int y = 0; y < height; y++){
-            if(map1[x][y] == 0 && map2[x][y] != 1){
-                int area = flood_search(x, y, 1);
+            if(map1[x][y] == 0 && map2[x][y] == 0){
+                search++;
+                int area = flood_search(x, y, search);
                 if(area < 11){
                     remove_x[remove] = x;
                     remove_y[remove] = y;
                     remove++;
+                }else{
+                    keep_x[keep] = x;
+                    keep_y[keep] = y;
+
+                    if(area > largest){
+                        largest = area;
+                        largest_id = keep;
+                        largest_search = search;
+                    }
+
+                    keep++;
                 }
             }
         }
@@ -379,6 +384,48 @@ void cave_gen(int acces){
 
     for(int i = 0; i < remove; i++){
         flood_remove(remove_x[i], remove_y[i]);
+    }
+
+    for(int i = 0; i < keep; i++){
+        if(i == largest_id){
+            continue;
+        }
+        int x = keep_x[i];
+        int y = keep_y[i];
+        int id = map2[x][y];
+
+        for(int j = 0; j < 20; j++){
+            int dir = rand() % search_cross;
+            if(map2[x + spatern_x[dir]][y + spatern_y[dir]] != id){
+                j--;
+                continue;
+            }
+            x += spatern_x[dir];
+            y += spatern_y[dir];
+        }
+
+        int dir = rand() % search_cross;
+        int temp_x = x;
+        int temp_y = y;
+        while(map2[temp_x][temp_y] != largest_search){
+            temp_x += spatern_x[dir];
+            temp_y += spatern_y[dir];
+            if(temp_x < 0 || temp_x > width - 1 || temp_y < 0 || temp_y > height - 1){
+                temp_x = x;
+                temp_y = y;
+                dir++;
+                if(dir == search_cross){
+                    dir = 0;
+                }
+            }
+        }
+
+        while(map1[x][y] != tile_rock){
+            x += spatern_x[dir];
+            y += spatern_y[dir];
+        }
+        tunel_gen(x, y, dir);
+        
     }
 
     //exit tunels
