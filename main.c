@@ -5,6 +5,7 @@
 #include "wchar.h"
 #include "termios.h"
 #include "unistd.h"
+#include "math.h"
 
 #define width 100
 #define height 100
@@ -49,12 +50,26 @@ typedef struct{
 }world_tile_t;
 
 typedef struct{
+    int dir;
     int x;
     int y;
 }player_t;
 
+typedef struct{
+    int deapth;
+    float start_slope;
+    float end_slope;
+}ROW;
+
+typedef struct{
+    int dir;
+    int origin_x;
+    int origin_y;
+}quadrent_t;
+
 int map1[width][height];
 int map2[width][height];
+int map3[width][height];
 
 int world_pos_x = 5;
 int world_pos_y = 5;
@@ -776,32 +791,37 @@ void draw_map(){
                 printf(" \x1b[32m@\x1b[0m ");
                 continue;
             }
-            switch(map1[x][y]){
-                case tile_floor:
-                    printf("   ");
-                    break;
-                case tile_rock:
-                    printf(" # ");
-                    break;
-                case tile_hardrock:
-                    printf(" & ");
-                    break;
-                case tile_wall:
-                    draw_wall(x, y);
-                    break;
-                case tile_door:
-                    printf(" D ");
-                    break;
-                case tile_exit:
-                    printf(" E ");
-                    break;
-                default:
-                    printf("???");
+            if(map3[x][y] == 1){
+                switch(map1[x][y]){
+                    case tile_floor:
+                        printf(" . ");
+                        break;
+                    case tile_rock:
+                        printf(" # ");
+                        break;
+                    case tile_hardrock:
+                        printf(" & ");
+                        break;
+                    case tile_wall:
+                        draw_wall(x, y);
+                        break;
+                    case tile_door:
+                        printf(" D ");
+                        break;
+                    case tile_exit:
+                        printf(" E ");
+                        break;
+                    default:
+                        printf("???");
+                }
+            }else{
+                printf("   ");
             }
-
+            map3[x][y] = 0;
         }
         printf("\n");
     }
+
     // printf("\nworld pos: %d, %d\n", world_pos_x, world_pos_y);
     // for(int y = 0; y < world_height; y++){
     //     printf("y: %2d ", y);
@@ -824,6 +844,105 @@ void draw_map(){
     // }
 }
 
+//visebilytty 
+float slope(int x, int y){
+    return (y - 0.5f) / x;
+}
+
+void transform(int x, int y, int* out_x, int* out_y){
+    switch(player.dir){
+        case left:
+            *out_x = player.x - x;
+            *out_y = player.y + y;
+            break;
+        case right:
+            *out_x = player.x + x;
+            *out_y = player.y + y;
+            break;
+        case upp:
+            *out_x = player.x + y;
+            *out_y = player.y - x;
+            break;
+        case down:
+            *out_x = player.x + y;
+            *out_y = player.y + x;
+            break;
+    }
+}
+
+int tiles(ROW row, int* out_x, int* out_y){
+    int min_col = floor((row.deapth * row.start_slope) + 0.5f);
+    int max_col = ceil((row.deapth * row.end_slope) - 0.5f);
+    for(int i = 0; i <= max_col - min_col; i++){
+        out_x[i] = row.deapth;
+        out_y[i] = min_col + i;
+    }
+    return max_col - min_col + 1;
+}
+
+void reveal_tile(int x, int y){
+    int true_x;
+    int true_y;
+
+    transform(x, y, &true_x, &true_y);
+    if(true_x < 0 || true_x > width - 1 || true_y < 0 || true_y > height - 1){
+        return;
+    }
+    map3[true_x][true_y] = 1;
+}
+
+int is_symmetric(ROW row, int x, int y){
+    return (y >= row.deapth * row.start_slope && y <= row.deapth * row.end_slope);
+}
+
+int get_tile(int x, int y){
+    if(x == -1 && y == -1){
+        return 0;
+    }
+    int true_x;
+    int true_y;
+
+    transform(x, y, &true_x, &true_y);
+    if(true_x < 0 || true_x > width - 1 || true_y < 0 || true_y > height - 1){
+        return -1;
+    }
+    if(map1[true_x][true_y] == tile_rock || map1[true_x][true_y] == tile_hardrock || map1[true_x][true_y] == tile_wall || map1[true_x][true_y] == tile_door){
+        return 1;
+    }
+    if(map1[true_x][true_y] == tile_floor || map1[true_x][true_y] == tile_exit){
+        return 0;
+    }
+    return 0;
+}
+
+void scan(ROW row){
+    int tile_x[100];
+    int tile_y[100];
+
+    int max = tiles(row, tile_x, tile_y);
+    int prev_tile = -1;
+
+    for(int i = 0; i < max; i++){
+        int tile = get_tile(tile_x[i], tile_y[i]);
+
+        if((tile == 1 || is_symmetric(row, tile_x[i], tile_y[i])) && tile != -1){
+            reveal_tile(tile_x[i], tile_y[i]);
+        }
+        if((prev_tile == 1 && tile == 0) && !(prev_tile == -1 || tile == -1)){
+            row.start_slope = slope(tile_x[i], tile_y[i]);
+        }
+        if((prev_tile == 0 && tile == 1) && !(prev_tile == -1 || tile == -1)){
+            ROW next_row = {.deapth = row.deapth + 1, .start_slope = row.start_slope, .end_slope = slope(tile_x[i], tile_y[i])};
+            scan(next_row);
+        }
+        prev_tile = tile;
+    }
+    if(prev_tile == 0){
+        ROW next_row = {.deapth = row.deapth + 1, .start_slope = row.start_slope, .end_slope = row.end_slope};
+        scan(next_row);
+    }
+}
+
 
 int main(){
     printf("\x1b[?1049h");
@@ -844,14 +963,25 @@ int main(){
     plase_player();
 
     printf("\x1b[f");
+    for(int i = 0; i < search_cross; i++){
+        player.dir = i;
+        ROW first_row = {.deapth = 1, .start_slope = -1, .end_slope = 1};
+        scan(first_row);
+    }
     draw_map();
 
     while(1){
-        printf("\x1b[f");
         int action = move_player();
         if(action == -1){
             break;
         }else if(action){
+            printf("\1xb[1;1H\e[2J");
+            for(int i = 0; i < search_cross; i++){
+                player.dir = i;
+                ROW first_row = {.deapth = 1, .start_slope = -1, .end_slope = 1};
+                scan(first_row);
+            }
+            printf("\x1b[f");
             draw_map();
         }
     }
