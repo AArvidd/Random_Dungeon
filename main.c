@@ -39,6 +39,11 @@ typedef enum{
     goblin,
 }enemies_enum;
 
+typedef enum{
+    map_normal,
+    map_world,
+}mape_modes_e;
+
 typedef struct{
     int curent;
     int next_empty;
@@ -95,6 +100,8 @@ int map4[width][height];
 int world_pos_x;
 int world_pos_y;
 
+int map_mode = 0;
+
 world_tile_t world_map[50][50];
 
 player_t player = {.damage = 2, .hp = 20};
@@ -104,6 +111,7 @@ int aktive_enemies;
 
 int spatern_x[] = {-1,  1,  0,  0, -1,  1, -1,  1};
 int spatern_y[] = { 0,  0, -1,  1, -1, -1,  1,  1};
+
 
 int wallchar[] = {0x256c, 0x2550, 0x2550, 0x2550, 0x2551, 0x255d, 0x255a, 0x2569, 0x2551, 0x2557, 0x2554, 0x2566, 0x2551, 0x2563, 0x2560, 0x256c};
 
@@ -756,54 +764,69 @@ int move_player(){
         case ' ':
             uppdate = 1;
             break;
-    }
-
-    if(map2[player.x + spatern_x[dir]][player.y + spatern_y[dir]] != 0){
-        int i;
-        for(i = 0; i < aktive_enemies; i++){
-            if(enemies[i].x == player.x + spatern_x[dir] && enemies[i].y == player.y + spatern_y[dir]){
-                break;
+        case 'm':
+        case 'M':
+            if(map_mode == map_normal){
+                map_mode = map_world;
+            }else{
+                map_mode = map_normal;
             }
-        }
-        if(enemies[i].hp > 0){
-            enemies[i].hp -= player.damage;
-        }else{
-            goto jump;
-        }
-        uppdate = 1;
-    }else if(
-       (map1[player.x + spatern_x[dir]][player.y + spatern_y[dir]] == tile_floor ||
-        map1[player.x + spatern_x[dir]][player.y + spatern_y[dir]] == tile_door  ||
-        map1[player.x + spatern_x[dir]][player.y + spatern_y[dir]] == tile_exit) && 
-        !(player.x + spatern_x[dir] < 0 || player.x + spatern_x[dir] > width - 1 || 
-          player.y + spatern_y[dir] < 0 || player.y + spatern_y[dir] > height - 1)
-    ){
-        jump:;
-        player.x += spatern_x[dir];
-        player.y += spatern_y[dir];
-        uppdate = 1;
+            printf("\x1b[1;1H\x1b[2J");
+            uppdate = 1;
+            break;
     }
 
-    //world movment
-    if(map1[player.x][player.y] == tile_exit){
-        int dir;
-        if(player.x == 0){
-            world_pos_x--;
-            dir = 3;
-        }else if(player.x == width - 1){
-            world_pos_x++;
-            dir = 2;
-        }else if(player.y == 0){
-            world_pos_y--;
-            dir = 1;
-        }else if(player.y == height - 1){
-            world_pos_y++;
-            dir = 0;
+    if(map_mode == map_normal && !(c == 'm' || c == 'M')){
+        if(map2[player.x + spatern_x[dir]][player.y + spatern_y[dir]] != 0){
+            int i;
+            for(i = 0; i < aktive_enemies; i++){
+                if(enemies[i].x == player.x + spatern_x[dir] && enemies[i].y == player.y + spatern_y[dir]){
+                    break;
+                }
+            }
+            if(enemies[i].hp > 0){
+                enemies[i].hp -= player.damage;
+                if(enemies[i].hp <= 0){
+                    player.hp += 6;
+                }
+            }else{
+                goto jump;
+            }
+            uppdate = 1;
+        }else if(
+        (map1[player.x + spatern_x[dir]][player.y + spatern_y[dir]] == tile_floor ||
+            map1[player.x + spatern_x[dir]][player.y + spatern_y[dir]] == tile_door  ||
+            map1[player.x + spatern_x[dir]][player.y + spatern_y[dir]] == tile_exit) && 
+            !(player.x + spatern_x[dir] < 0 || player.x + spatern_x[dir] > width - 1 || 
+            player.y + spatern_y[dir] < 0 || player.y + spatern_y[dir] > height - 1)
+        ){
+            jump:;
+            player.x += spatern_x[dir];
+            player.y += spatern_y[dir];
+            uppdate = 1;
         }
-        map_gen();
-        player.x = world_map[world_pos_x][world_pos_y].exits_x[dir];
-        player.y = world_map[world_pos_x][world_pos_y].exits_y[dir];
-        uppdate = 1;
+
+        //world movment
+        if(map1[player.x][player.y] == tile_exit){
+            int dir;
+            if(player.x == 0){
+                world_pos_x--;
+                dir = 3;
+            }else if(player.x == width - 1){
+                world_pos_x++;
+                dir = 2;
+            }else if(player.y == 0){
+                world_pos_y--;
+                dir = 1;
+            }else if(player.y == height - 1){
+                world_pos_y++;
+                dir = 0;
+            }
+            map_gen();
+            player.x = world_map[world_pos_x][world_pos_y].exits_x[dir];
+            player.y = world_map[world_pos_x][world_pos_y].exits_y[dir];
+            uppdate = 1;
+        }
     }
 
     return uppdate;
@@ -986,65 +1009,69 @@ void draw_tile(int x, int y){
 }
 
 void draw_map(){
-    printf("       ");
-    for(int x = 0; x < width; x++){
-        printf("%2d ", x);
-    }
-    printf("\n");
-
-    for(int y = 0; y < height; y++){
-        printf("y = %2d:", y);
+    if(map_mode == map_normal){
+        printf("       ");
         for(int x = 0; x < width; x++){
-            if(x == player.x && y == player.y){
-                printf(" \x1b[32m@\x1b[0m ");
-                continue;
-            }
-            if(map3[x][y] == 1){
-                if(map2[x][y] != 0){
-                    int i;
-                    for(i = 0; i < aktive_enemies; i++){
-                        if(enemies[i].x == x && enemies[i].y == y){
-                            break;
+            printf("%2d ", x);
+        }
+        printf("\n");
+
+        for(int y = 0; y < height; y++){
+            printf("y = %2d:", y);
+            for(int x = 0; x < width; x++){
+                if(x == player.x && y == player.y){
+                    printf(" \x1b[32m@\x1b[0m ");
+                    continue;
+                }
+                if(map3[x][y] == 1){
+                    if(map2[x][y] != 0){
+                        int i;
+                        for(i = 0; i < aktive_enemies; i++){
+                            if(enemies[i].x == x && enemies[i].y == y){
+                                break;
+                            }
                         }
-                    }
-                    if(enemies[i].hp > 0){
-                        printf("\x1b[31m G \x1b[0m");
+                        if(enemies[i].hp > 0){
+                            printf("\x1b[31m G \x1b[0m");
+                        }else{
+                            draw_tile(x, y);
+                        }
                     }else{
                         draw_tile(x, y);
                     }
                 }else{
-                    draw_tile(x, y);
+                    printf("   ");
                 }
-            }else{
-                printf("   ");
+                map3[x][y] = 0;
             }
-            map3[x][y] = 0;
+            printf("\n");
         }
+        printf("\nMove: W, A, S, D   HP = %d", player.hp);
         printf("\n");
+
+    }else if(map_mode == map_world){
+        printf("world pos: %d, %d\n", world_pos_x, world_pos_y);
+        for(int y = 0; y < world_height; y++){
+            printf("y: %2d ", y);
+            for(int x = 0; x < world_width; x++){
+
+                if(x == world_pos_x && y == world_pos_y){
+                    printf("\x1b[31m");
+                }
+
+                wprintf(L"%lc", wallchar[world_map[x][y].conection]);
+                if(world_map[x][y].conection & 1 << 1 && world_map[x + 1][y].conection & 1){
+                    wprintf(L"%lc", wallchar[1]);
+                }else{
+                    printf(" ");
+                }
+                printf("\x1b[0m");
+
+            }
+            printf("\n");
+        }
     }
-    printf("\nMove: W, A, S, D   HP = %d", player.hp);
-    printf("\n");
 
-    // printf("\nworld pos: %d, %d\n", world_pos_x, world_pos_y);
-    // for(int y = 0; y < world_height; y++){
-    //     printf("y: %2d ", y);
-    //     for(int x = 0; x < world_width; x++){
-
-    //         if(x == world_pos_x && y == world_pos_y){
-    //             printf("\x1b[31m");
-    //         }
-
-    //         wprintf(L"%lc", wallchar[world_map[x][y].conection]);
-    //         if(world_map[x][y].conection & 1 << 1 && world_map[x + 1][y].conection & 1){
-    //             wprintf(L"%lc", wallchar[1]);
-    //         }else{
-    //             printf(" ");
-    //         }
-    //         printf("\x1b[0m");
-
-    //     }
-    //     printf("\n");
-    // }
 }
 
 //visebilytty 
@@ -1179,20 +1206,23 @@ int main(){
         if(action == -1){
             break;
         }else if(action){
-            for(int i = 0; i < search_cross; i++){
-                player.dir = i;
-                ROW first_row = {.deapth = 1, .start_slope = -1, .end_slope = 1};
-                scan(first_row);
+            if(map_mode == map_normal){
+                for(int i = 0; i < search_cross; i++){
+                    player.dir = i;
+                    ROW first_row = {.deapth = 1, .start_slope = -1, .end_slope = 1};
+                    scan(first_row);
+                }
+                enemies_uppdete();
             }
-            enemies_uppdete();
-            // printf("\x1b[f");
             draw_map();
             printf("\x1b[f");
         }
     }
-    printf("\x1b[1;1H\e[2J\x1b[31mGame Over\x1b[0m\nPress enter to quit\n");
+    if(player.hp <=0){
+        printf("\x1b[1;1H\e[2J\x1b[31mGame Over\x1b[0m\nPress enter to quit\n");
 
-    while(getchar() != '\n');
+        while(getchar() != '\n');
+    }
 
     tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
 
