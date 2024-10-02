@@ -55,6 +55,8 @@ typedef struct{
 }world_tile_t;
 
 typedef struct{
+    int damage;
+    int hp;
     int dir;
     int x;
     int y;
@@ -73,6 +75,7 @@ typedef struct{
 }quadrent_t;
 
 typedef struct{
+    int damage;
     int x;
     int y;
     int hp;
@@ -94,7 +97,7 @@ int world_pos_y;
 
 world_tile_t world_map[50][50];
 
-player_t player;
+player_t player = {.damage = 2, .hp = 20};
 
 enemies_t enemies[100];
 int aktive_enemies;
@@ -674,7 +677,7 @@ void enemies_gen(){
             x = rand() % width;
             y = rand() % height;    
         }
-        enemies[i] = (enemies_t){.hp = 10, .x = x, .y = y, .steps = -1};
+        enemies[i] = (enemies_t){.hp = 10, .x = x, .y = y, .steps = -1, .damage = 1};
         map2[x][y] = 1;
         aktive_enemies++;
     }
@@ -723,61 +726,62 @@ int move_player(){
     //map movment
     int uppdate = 0;
     char c;
-    int olde_x = player.x;
-    int olde_y = player.y;
+    int dir = -1;
     c = getchar();
     printf("\x1b[F \b");
     switch(c){
         case 'w':
         case 'W':
-            if((map1[player.x][player.y - 1] == tile_floor ||
-                map1[player.x][player.y - 1] == tile_door  ||
-                map1[player.x][player.y - 1] == tile_exit) &&
-                !(player.y - 1 < 0)
-            ){
-                player.y--;
-                uppdate = 1;
-            }
+            dir = upp;
             break;
         
         case 's':
         case 'S':
-            if((map1[player.x][player.y + 1] == tile_floor ||
-                map1[player.x][player.y + 1] == tile_door  ||
-                map1[player.x][player.y + 1] == tile_exit) &&
-                !(player.y + 1 > width - 1)
-            ){
-                player.y++;
-                uppdate = 1;
-            }
+            dir = down;
             break;
         
         case 'a':
         case 'A':
-            if((map1[player.x - 1][player.y] == tile_floor ||
-                map1[player.x - 1][player.y] == tile_door  ||
-                map1[player.x - 1][player.y] == tile_exit) &&
-                !(player.x - 1 < 0)
-            ){
-                player.x--;
-                uppdate = 1;
-            }
+            dir = left;
             break;
         
         case 'd':
         case 'D':
-            if((map1[player.x + 1][player.y] == tile_floor ||
-                map1[player.x + 1][player.y] == tile_door  ||
-                map1[player.x + 1][player.y] == tile_exit) &&
-                !(player.x + 1 > height -1)
-            ){
-                player.x++;
-                uppdate = 1;
-            }
+            dir = right;
             break;
         case 'e':
         case 'E':
             return -1;
+            break;
+        case ' ':
+            uppdate = 1;
+            break;
+    }
+
+    if(map2[player.x + spatern_x[dir]][player.y + spatern_y[dir]] != 0){
+        int i;
+        for(i = 0; i < aktive_enemies; i++){
+            if(enemies[i].x == player.x + spatern_x[dir] && enemies[i].y == player.y + spatern_y[dir]){
+                break;
+            }
+        }
+        if(enemies[i].hp > 0){
+            enemies[i].hp -= player.damage;
+        }else{
+            goto jump;
+        }
+        uppdate = 1;
+    }else if(
+       (map1[player.x + spatern_x[dir]][player.y + spatern_y[dir]] == tile_floor ||
+        map1[player.x + spatern_x[dir]][player.y + spatern_y[dir]] == tile_door  ||
+        map1[player.x + spatern_x[dir]][player.y + spatern_y[dir]] == tile_exit) && 
+        !(player.x + spatern_x[dir] < 0 || player.x + spatern_x[dir] > width - 1 || 
+          player.y + spatern_y[dir] < 0 || player.y + spatern_y[dir] > height - 1)
+    ){
+        jump:;
+        player.x += spatern_x[dir];
+        player.y += spatern_y[dir];
+        uppdate = 1;
     }
 
     //world movment
@@ -807,6 +811,9 @@ int move_player(){
 
 void enemies_uppdete(){
     for(int i = 0; i < aktive_enemies; i++){
+        if(enemies[i].hp <= 0){
+            continue;
+        }
         if(map3[enemies[i].x][enemies[i].y] == 1 || enemies[i].seen){
             enemies[i].to_x = player.x;
             enemies[i].to_y = player.y;
@@ -913,11 +920,16 @@ void enemies_uppdete(){
             enemies[i].seen = 1;
         }
         if(enemies[i].steps != -1){
-            map2[enemies[i].x][enemies[i].y] = 0;
-            enemies[i].x = enemies[i].path_x[enemies[i].steps];
-            enemies[i].y = enemies[i].path_y[enemies[i].steps];
-            map2[enemies[i].x][enemies[i].y] = 1;
-            enemies[i].steps--;
+
+            if(enemies[i].path_x[enemies[i].steps] == player.x && enemies[i].path_y[enemies[i].steps] == player.y){
+                player.hp -= enemies[i].damage;
+            }else{
+                map2[enemies[i].x][enemies[i].y] = 0;
+                enemies[i].x = enemies[i].path_x[enemies[i].steps];
+                enemies[i].y = enemies[i].path_y[enemies[i].steps];
+                map2[enemies[i].x][enemies[i].y] = 1;
+                enemies[i].steps--;
+            }
         }
 
     }
@@ -948,6 +960,31 @@ void draw_wall(int x, int y){
     
 }
 
+void draw_tile(int x, int y){
+    switch(map1[x][y]){
+        case tile_floor:
+            printf(" . ");
+            break;
+        case tile_rock:
+            printf(" # ");
+            break;
+        case tile_hardrock:
+            printf(" & ");
+            break;
+        case tile_wall:
+            draw_wall(x, y);
+            break;
+        case tile_door:
+            printf(" D ");
+            break;
+        case tile_exit:
+            printf(" E ");
+            break;
+        default:
+            printf("???");
+    }
+}
+
 void draw_map(){
     printf("       ");
     for(int x = 0; x < width; x++){
@@ -964,30 +1001,19 @@ void draw_map(){
             }
             if(map3[x][y] == 1){
                 if(map2[x][y] != 0){
-                    printf("\x1b[31m G \x1b[0m");
-                }else{
-                    switch(map1[x][y]){
-                        case tile_floor:
-                            printf(" . ");
+                    int i;
+                    for(i = 0; i < aktive_enemies; i++){
+                        if(enemies[i].x == x && enemies[i].y == y){
                             break;
-                        case tile_rock:
-                            printf(" # ");
-                            break;
-                        case tile_hardrock:
-                            printf(" & ");
-                            break;
-                        case tile_wall:
-                            draw_wall(x, y);
-                            break;
-                        case tile_door:
-                            printf(" D ");
-                            break;
-                        case tile_exit:
-                            printf(" E ");
-                            break;
-                        default:
-                            printf("???");
+                        }
                     }
+                    if(enemies[i].hp > 0){
+                        printf("\x1b[31m G \x1b[0m");
+                    }else{
+                        draw_tile(x, y);
+                    }
+                }else{
+                    draw_tile(x, y);
                 }
             }else{
                 printf("   ");
@@ -996,6 +1022,8 @@ void draw_map(){
         }
         printf("\n");
     }
+    printf("\nMove: W, A, S, D   HP = %d", player.hp);
+    printf("\n");
 
     // printf("\nworld pos: %d, %d\n", world_pos_x, world_pos_y);
     // for(int y = 0; y < world_height; y++){
@@ -1146,7 +1174,7 @@ int main(){
     draw_map();
     printf("\x1b[f");
 
-    while(1){
+    while(player.hp > 0){
         int action = move_player();
         if(action == -1){
             break;
@@ -1157,11 +1185,14 @@ int main(){
                 scan(first_row);
             }
             enemies_uppdete();
-            printf("\x1b[f");
+            // printf("\x1b[f");
             draw_map();
             printf("\x1b[f");
         }
     }
+    printf("\x1b[1;1H\e[2J\x1b[31mGame Over\x1b[0m\nPress enter to quit\n");
+
+    while(getchar() != '\n');
 
     tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
 
