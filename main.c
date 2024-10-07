@@ -710,7 +710,7 @@ void map_gen(){
     add_hardrock();
 }
 
-//player movment and map render
+//movment and map render
 float distens(int x1, int y1, int x2, int y2){
     int x = x1 - x2;
     int y = y1 - y2;
@@ -762,8 +762,7 @@ int move_player(){
             return -1;
             break;
         case ' ':
-            uppdate = 1;
-            break;
+            return 1;
         case 'm':
         case 'M':
             if(map_mode == map_normal){
@@ -772,35 +771,32 @@ int move_player(){
                 map_mode = map_normal;
             }
             printf("\x1b[1;1H\x1b[2J");
-            uppdate = 1;
-            break;
+            return 1;
+        default:
+            return 0;
     }
 
-    if(map_mode == map_normal && !(c == 'm' || c == 'M')){
+    if(map_mode == map_normal){
         if(map2[player.x + spatern_x[dir]][player.y + spatern_y[dir]] != 0){
             int i;
             for(i = 0; i < aktive_enemies; i++){
-                if(enemies[i].x == player.x + spatern_x[dir] && enemies[i].y == player.y + spatern_y[dir]){
+                if(enemies[i].x == player.x + spatern_x[dir] && enemies[i].y == player.y + spatern_y[dir] && enemies[i].hp > 0){
                     break;
                 }
             }
-            if(enemies[i].hp > 0){
-                enemies[i].hp -= player.damage;
-                if(enemies[i].hp <= 0){
-                    player.hp += 6;
-                }
-            }else{
-                goto jump;
+            enemies[i].hp -= player.damage;
+            if(enemies[i].hp <= 0){
+                player.hp += 6;
+                map2[enemies[i].x][enemies[i].y] = 0;
             }
             uppdate = 1;
         }else if(
-        (map1[player.x + spatern_x[dir]][player.y + spatern_y[dir]] == tile_floor ||
+           (map1[player.x + spatern_x[dir]][player.y + spatern_y[dir]] == tile_floor ||
             map1[player.x + spatern_x[dir]][player.y + spatern_y[dir]] == tile_door  ||
             map1[player.x + spatern_x[dir]][player.y + spatern_y[dir]] == tile_exit) && 
             !(player.x + spatern_x[dir] < 0 || player.x + spatern_x[dir] > width - 1 || 
             player.y + spatern_y[dir] < 0 || player.y + spatern_y[dir] > height - 1)
         ){
-            jump:;
             player.x += spatern_x[dir];
             player.y += spatern_y[dir];
             uppdate = 1;
@@ -832,7 +828,113 @@ int move_player(){
     return uppdate;
 }
 
+void enemies_pathfinding(int i){
+    for(int j = 0; j < queue_lenth; j++){
+        queue.queue_x[j] = -1;
+        queue.queue_y[j] = -1;
+    }
+    for(int x = 0; x < width; x++){
+        for(int y = 0; y < height; y++){
+            map4[x][y] = -1;
+        }
+    }
+
+    queue.queue_x[0] = enemies[i].x;
+    queue.queue_y[0] = enemies[i].y;
+    map4[enemies[i].x][enemies[i].y] = 0;
+    // queue.next_empty++;
+
+    while(1){
+
+        int next = 0;
+        for(int j = 1; j < queue_lenth; j++){
+            if(queue.queue_x[j] == -1 || queue.queue_y[j] == -1){
+                continue;
+            }
+            if(map4[queue.queue_x[next]][queue.queue_y[next]] > map4[queue.queue_x[j]][queue.queue_y[j]] || queue.queue_x[next] == -1){
+                next = j;
+            }
+        }
+        if(next == 0 && queue.queue_x[next] == -1){
+            break;
+        }
+
+        if( map1[queue.queue_x[next]][queue.queue_y[next]] == tile_rock ||
+            map1[queue.queue_x[next]][queue.queue_y[next]] == tile_hardrock ||
+            map1[queue.queue_x[next]][queue.queue_y[next]] == tile_wall ||
+            map2[queue.queue_x[next]][queue.queue_y[next]] != 0
+        ){
+            queue.queue_x[next] = -1;
+            queue.queue_y[next] = -1;
+            continue;
+        }
+
+        for(int j = 0; j < search_cross; j++){
+            
+            if(enemies[i].to_x == queue.queue_x[next] + spatern_x[j] && enemies[i].to_y == queue.queue_y[next] + spatern_y[j]){
+                map4[enemies[i].to_x][enemies[i].to_y] = j ^ 1;
+                goto exit;
+            }
+
+            // int g = map4[queue.queue_x[next]][queue.queue_y[next]] + 1;
+            int g = 0;
+            float h = distens(queue.queue_x[next] + spatern_x[j], queue.queue_y[next] + spatern_y[j], enemies[i].to_x, enemies[i].to_y);
+            int f = (g + (int)ceil(h)) << 2;
+
+            if(f >= (map4[queue.queue_x[next] + spatern_x[j]][queue.queue_y[next] + spatern_y[j]] & ~3) && map4[queue.queue_x[next] + spatern_x[j]][queue.queue_y[next] + spatern_y[j]] != -1){
+                continue;
+            }
+
+            f |= j ^ 1;
+            map4[queue.queue_x[next] + spatern_x[j]][queue.queue_y[next] + spatern_y[j]] = f;
+
+            for(int k = 0; k < queue_lenth; k++){
+                if(queue.queue_x[k] == -1 && queue.queue_y[k] == -1){
+                    queue.queue_x[k] = queue.queue_x[next] + spatern_x[j];
+                    queue.queue_y[k] = queue.queue_y[next] + spatern_y[j];
+                    break;
+                }
+            }
+
+        }
+        queue.queue_x[next] = -1;
+        queue.queue_y[next] = -1;
+    }
+    exit:;
+
+    int follower_x = enemies[i].to_x;
+    int follower_y = enemies[i].to_y;
+
+    enemies[i].steps = 0;
+
+
+    while(follower_x != enemies[i].x || follower_y != enemies[i].y){
+        enemies[i].path_x[enemies[i].steps] = follower_x;
+        enemies[i].path_y[enemies[i].steps] = follower_y;
+
+        int dir = map4[follower_x][follower_y] & 3;
+        follower_x += spatern_x[dir];
+        follower_y += spatern_y[dir];
+        enemies[i].steps++;
+    }
+    enemies[i].steps--;
+
+    for(int x = 0; x < width; x++){
+        for(int y = 0; y < height; y++){
+            map4[x][y] = 0;
+        }
+    }
+
+}
+
 void enemies_uppdete(){
+
+    for(int x = 0; x < width; x++){
+        for(int y = 0; y < height; y++){
+            map2[x][y] = 0;
+        }
+    }
+
     for(int i = 0; i < aktive_enemies; i++){
         if(enemies[i].hp <= 0){
             continue;
@@ -840,102 +942,7 @@ void enemies_uppdete(){
         if(map3[enemies[i].x][enemies[i].y] == 1 || enemies[i].seen){
             enemies[i].to_x = player.x;
             enemies[i].to_y = player.y;
-
-            for(int j = 0; j < queue_lenth; j++){
-                queue.queue_x[j] = -1;
-                queue.queue_y[j] = -1;
-            }
-            for(int x = 0; x < width; x++){
-                for(int y = 0; y < height; y++){
-                    map4[x][y] = -1;
-                }
-            }
-
-            queue.queue_x[0] = enemies[i].x;
-            queue.queue_y[0] = enemies[i].y;
-            map4[enemies[i].x][enemies[i].y] = 0;
-            // queue.next_empty++;
-
-            while(1){
-
-                int next = 0;
-                for(int j = 1; j < queue_lenth; j++){
-                    if(queue.queue_x[j] == -1 || queue.queue_y[j] == -1){
-                        continue;
-                    }
-                    if(map4[queue.queue_x[next]][queue.queue_y[next]] > map4[queue.queue_x[j]][queue.queue_y[j]] || queue.queue_x[next] == -1){
-                        next = j;
-                    }
-                }
-                if(next == 0 && queue.queue_x[next] == -1){
-                    break;
-                }
-
-                if( map1[queue.queue_x[next]][queue.queue_y[next]] == tile_rock ||
-                    map1[queue.queue_x[next]][queue.queue_y[next]] == tile_hardrock ||
-                    map1[queue.queue_x[next]][queue.queue_y[next]] == tile_wall
-                ){
-                    queue.queue_x[next] = -1;
-                    queue.queue_y[next] = -1;
-                    continue;
-                }
-
-                for(int j = 0; j < search_cross; j++){
-                    
-                    if(player.x == queue.queue_x[next] + spatern_x[j] && player.y == queue.queue_y[next] + spatern_y[j]){
-                        map4[player.x][player.y] = j ^ 1;
-                        goto exit;
-                    }
-
-                    // int g = map4[queue.queue_x[next]][queue.queue_y[next]] + 1;
-                    int g = 0;
-                    float h = distens(queue.queue_x[next] + spatern_x[j], queue.queue_y[next] + spatern_y[j], player.x, player.y);
-                    int f = (g + (int)ceil(h)) << 2;
-
-                    if(f >= (map4[queue.queue_x[next] + spatern_x[j]][queue.queue_y[next] + spatern_y[j]] & ~3) && map4[queue.queue_x[next] + spatern_x[j]][queue.queue_y[next] + spatern_y[j]] != -1){
-                        continue;
-                    }
-
-                    f |= j ^ 1;
-                    map4[queue.queue_x[next] + spatern_x[j]][queue.queue_y[next] + spatern_y[j]] = f;
-
-                    for(int k = 0; k < queue_lenth; k++){
-                        if(queue.queue_x[k] == -1 && queue.queue_y[k] == -1){
-                            queue.queue_x[k] = queue.queue_x[next] + spatern_x[j];
-                            queue.queue_y[k] = queue.queue_y[next] + spatern_y[j];
-                            break;
-                        }
-                    }
-
-                }
-                queue.queue_x[next] = -1;
-                queue.queue_y[next] = -1;
-            }
-            exit:;
-
-            int follower_x = player.x;
-            int follower_y = player.y;
-
-            enemies[i].steps = 0;
-
-
-            while(follower_x != enemies[i].x || follower_y != enemies[i].y){
-                enemies[i].path_x[enemies[i].steps] = follower_x;
-                enemies[i].path_y[enemies[i].steps] = follower_y;
-
-                int dir = map4[follower_x][follower_y] & 3;
-                follower_x += spatern_x[dir];
-                follower_y += spatern_y[dir];
-                enemies[i].steps++;
-            }
-            enemies[i].steps--;
-
-            for(int x = 0; x < width; x++){
-                for(int y = 0; y < height; y++){
-                    map4[x][y] = 0;
-                }
-            }
-
+            enemies_pathfinding(i);
         }
 
         enemies[i].seen = 0;
@@ -947,13 +954,12 @@ void enemies_uppdete(){
             if(enemies[i].path_x[enemies[i].steps] == player.x && enemies[i].path_y[enemies[i].steps] == player.y){
                 player.hp -= enemies[i].damage;
             }else{
-                map2[enemies[i].x][enemies[i].y] = 0;
                 enemies[i].x = enemies[i].path_x[enemies[i].steps];
                 enemies[i].y = enemies[i].path_y[enemies[i].steps];
-                map2[enemies[i].x][enemies[i].y] = 1;
                 enemies[i].steps--;
             }
         }
+        map2[enemies[i].x][enemies[i].y] = 1;
 
     }
 }
@@ -1025,17 +1031,7 @@ void draw_map(){
                 }
                 if(map3[x][y] == 1){
                     if(map2[x][y] != 0){
-                        int i;
-                        for(i = 0; i < aktive_enemies; i++){
-                            if(enemies[i].x == x && enemies[i].y == y){
-                                break;
-                            }
-                        }
-                        if(enemies[i].hp > 0){
-                            printf("\x1b[31m G \x1b[0m");
-                        }else{
-                            draw_tile(x, y);
-                        }
+                        printf("\x1b[31m G \x1b[0m");
                     }else{
                         draw_tile(x, y);
                     }
@@ -1046,7 +1042,7 @@ void draw_map(){
             }
             printf("\n");
         }
-        printf("\nMove: W, A, S, D   HP = %d", player.hp);
+        printf("\nMove: W, A, S, D   HP = %2d", player.hp);
         printf("\n");
 
     }else if(map_mode == map_world){
