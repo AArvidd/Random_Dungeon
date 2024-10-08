@@ -709,8 +709,8 @@ void enemies_gen(){
             x = rand() % width;
             y = rand() % height;    
         }
-        // int type = rand() % (enemies_types_amount - 1) + 1;
-        int type = 4;
+        int type = rand() % (enemies_types_amount - 1) + 1;
+        // int type = 4;
         enemies[i] = (enemies_t){.hp = enemies_types[type].hp, .x = x, .y = y, .steps = -1, .type = type};
         map2[x][y] = 1;
         aktive_enemies++;
@@ -998,7 +998,7 @@ void enemies_uppdete(){
                 enemies[i].movment--;
             }
         }
-        map2[enemies[i].x][enemies[i].y] = 1;
+        map2[enemies[i].x][enemies[i].y] = enemies[i].type;
 
     }
 }
@@ -1053,6 +1053,29 @@ void draw_tile(int x, int y){
     }
 }
 
+void draw_enemie(int i){
+    printf(" ");
+    switch(i){
+        case 1:
+            printf("\e[32mG");
+            break;
+        case 2:
+            printf("\e[90m&");
+            break;
+        case 3:
+            printf("\e[35mM");
+            break;
+        case 4:
+            printf("\e[33mL");
+            break;
+
+        default:
+            printf("\e[31m?");
+            break;
+    }
+    printf("\e[0m ");
+}
+
 void draw_map(){
     if(map_mode == map_normal){
         printf("       ");
@@ -1070,7 +1093,7 @@ void draw_map(){
                 }
                 if(map3[x][y] == 1){
                     if(map2[x][y] != 0){
-                        printf("\x1b[31m G \x1b[0m");
+                        draw_enemie(map2[x][y]);
                     }else{
                         draw_tile(x, y);
                     }
