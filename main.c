@@ -37,6 +37,12 @@ typedef enum{
 typedef enum{
     no_enemie,
     goblin,
+    golem,
+    bicorn,
+    lion,
+
+    enemies_types_amount,
+
 }enemies_enum;
 
 typedef enum{
@@ -80,7 +86,15 @@ typedef struct{
 }quadrent_t;
 
 typedef struct{
+    int hp;
     int damage;
+    int spead;
+    int movement_x[8];
+    int movement_y[8];
+    int movment_option;
+}enemies_type_t;
+
+typedef struct{
     int x;
     int y;
     int hp;
@@ -90,6 +104,8 @@ typedef struct{
     int path_y[256];
     int steps;
     int seen;
+    int type;
+    int movment;
 }enemies_t;
 
 int map1[width][height];
@@ -108,6 +124,14 @@ player_t player = {.damage = 2, .hp = 20};
 
 enemies_t enemies[100];
 int aktive_enemies;
+
+enemies_type_t enemies_types[] = {
+    { 0 },
+    {.damage = 1, .hp = 10, .spead = 0, .movment_option = 4, .movement_x = {-1,  1,  0,  0}, .movement_y = {0,  0, -1,  1}},
+    {.damage = 2, .hp = 20, .spead = 2, .movment_option = 4, .movement_x = {-1,  1,  0,  0}, .movement_y = {0,  0, -1,  1}},
+    {.damage = 1, .hp =  8, .spead = 0, .movment_option = 8, .movement_x = {-1,  1,  1, -1,  2, -2,  2, -2}, .movement_y = {-2,  2, -2,  2, -1,  1,  1, -1}},
+    {.damage = 2, .hp =  8, .spead = 0, .movment_option = 8, .movement_x = {-2,  2,  0,  0, -1,  1,  0,  0}, .movement_y = { 0,  0, -2,  2,  0,  0, -1,  1}},
+};
 
 int spatern_x[] = {-1,  1,  0,  0, -1,  1, -1,  1};
 int spatern_y[] = { 0,  0, -1,  1, -1, -1,  1,  1};
@@ -685,7 +709,9 @@ void enemies_gen(){
             x = rand() % width;
             y = rand() % height;    
         }
-        enemies[i] = (enemies_t){.hp = 10, .x = x, .y = y, .steps = -1, .damage = 1};
+        // int type = rand() % (enemies_types_amount - 1) + 1;
+        int type = 4;
+        enemies[i] = (enemies_t){.hp = enemies_types[type].hp, .x = x, .y = y, .steps = -1, .type = type};
         map2[x][y] = 1;
         aktive_enemies++;
     }
@@ -829,6 +855,7 @@ int move_player(){
 }
 
 void enemies_pathfinding(int i){
+    int no_path = 0;
     for(int j = 0; j < queue_lenth; j++){
         queue.queue_x[j] = -1;
         queue.queue_y[j] = -1;
@@ -855,43 +882,48 @@ void enemies_pathfinding(int i){
                 next = j;
             }
         }
-        if(next == 0 && queue.queue_x[next] == -1){
+        if(next == 0 && queue.queue_x[next] == -1 && queue.queue_y[next] == -1){
+            no_path = 1;
             break;
         }
 
         if( map1[queue.queue_x[next]][queue.queue_y[next]] == tile_rock ||
             map1[queue.queue_x[next]][queue.queue_y[next]] == tile_hardrock ||
             map1[queue.queue_x[next]][queue.queue_y[next]] == tile_wall ||
-            map2[queue.queue_x[next]][queue.queue_y[next]] != 0
+            map2[queue.queue_x[next]][queue.queue_y[next]] != 0 ||
+            queue.queue_x[next] < 0 || queue.queue_x[next] > width - 1 || 
+            queue.queue_y[next] < 0 || queue.queue_y[next] > height - 1
         ){
             queue.queue_x[next] = -1;
             queue.queue_y[next] = -1;
             continue;
         }
 
-        for(int j = 0; j < search_cross; j++){
+        for(int j = 0; j < enemies_types[enemies[i].type].movment_option; j++){
             
-            if(enemies[i].to_x == queue.queue_x[next] + spatern_x[j] && enemies[i].to_y == queue.queue_y[next] + spatern_y[j]){
+            if(enemies[i].to_x == queue.queue_x[next] + enemies_types[enemies[i].type].movement_x[j] && enemies[i].to_y == queue.queue_y[next] + enemies_types[enemies[i].type].movement_y[j]){
                 map4[enemies[i].to_x][enemies[i].to_y] = j ^ 1;
                 goto exit;
             }
 
             // int g = map4[queue.queue_x[next]][queue.queue_y[next]] + 1;
             int g = 0;
-            float h = distens(queue.queue_x[next] + spatern_x[j], queue.queue_y[next] + spatern_y[j], enemies[i].to_x, enemies[i].to_y);
-            int f = (g + (int)ceil(h)) << 2;
+            float h = distens(queue.queue_x[next] + enemies_types[enemies[i].type].movement_x[j], queue.queue_y[next] + enemies_types[enemies[i].type].movement_y[j], enemies[i].to_x, enemies[i].to_y);
+            int f = (g + (int)ceil(h)) << 3;
 
-            if(f >= (map4[queue.queue_x[next] + spatern_x[j]][queue.queue_y[next] + spatern_y[j]] & ~3) && map4[queue.queue_x[next] + spatern_x[j]][queue.queue_y[next] + spatern_y[j]] != -1){
+            if(/* f >= (map4[queue.queue_x[next] + enemies_types[enemies[i].type].movement_x[j]][queue.queue_y[next] + enemies_types[enemies[i].type].movement_y[j]] & ~3) &&  */
+                map4[queue.queue_x[next] + enemies_types[enemies[i].type].movement_x[j]][queue.queue_y[next] + enemies_types[enemies[i].type].movement_y[j]] != -1
+            ){
                 continue;
             }
 
             f |= j ^ 1;
-            map4[queue.queue_x[next] + spatern_x[j]][queue.queue_y[next] + spatern_y[j]] = f;
+            map4[queue.queue_x[next] + enemies_types[enemies[i].type].movement_x[j]][queue.queue_y[next] + enemies_types[enemies[i].type].movement_y[j]] = f;
 
             for(int k = 0; k < queue_lenth; k++){
                 if(queue.queue_x[k] == -1 && queue.queue_y[k] == -1){
-                    queue.queue_x[k] = queue.queue_x[next] + spatern_x[j];
-                    queue.queue_y[k] = queue.queue_y[next] + spatern_y[j];
+                    queue.queue_x[k] = queue.queue_x[next] + enemies_types[enemies[i].type].movement_x[j];
+                    queue.queue_y[k] = queue.queue_y[next] + enemies_types[enemies[i].type].movement_y[j];
                     break;
                 }
             }
@@ -902,22 +934,24 @@ void enemies_pathfinding(int i){
     }
     exit:;
 
-    int follower_x = enemies[i].to_x;
-    int follower_y = enemies[i].to_y;
+    if(!no_path){
+        int follower_x = enemies[i].to_x;
+        int follower_y = enemies[i].to_y;
 
-    enemies[i].steps = 0;
+        enemies[i].steps = 0;
 
 
-    while(follower_x != enemies[i].x || follower_y != enemies[i].y){
-        enemies[i].path_x[enemies[i].steps] = follower_x;
-        enemies[i].path_y[enemies[i].steps] = follower_y;
+        while(follower_x != enemies[i].x || follower_y != enemies[i].y){
+            enemies[i].path_x[enemies[i].steps] = follower_x;
+            enemies[i].path_y[enemies[i].steps] = follower_y;
 
-        int dir = map4[follower_x][follower_y] & 3;
-        follower_x += spatern_x[dir];
-        follower_y += spatern_y[dir];
-        enemies[i].steps++;
+            int dir = map4[follower_x][follower_y] & 7;
+            follower_x += enemies_types[enemies[i].type].movement_x[dir];
+            follower_y += enemies_types[enemies[i].type].movement_y[dir];
+            enemies[i].steps++;
+        }
+        enemies[i].steps--;
     }
-    enemies[i].steps--;
 
     for(int x = 0; x < width; x++){
         for(int y = 0; y < height; y++){
@@ -950,13 +984,18 @@ void enemies_uppdete(){
             enemies[i].seen = 1;
         }
         if(enemies[i].steps != -1){
+            if(enemies[i].movment == 0){
+                enemies[i].movment = enemies_types[enemies[i].type].spead;
 
-            if(enemies[i].path_x[enemies[i].steps] == player.x && enemies[i].path_y[enemies[i].steps] == player.y){
-                player.hp -= enemies[i].damage;
+                if(enemies[i].path_x[enemies[i].steps] == player.x && enemies[i].path_y[enemies[i].steps] == player.y){
+                    player.hp -= enemies_types[enemies[i].type].damage;
+                }else{
+                    enemies[i].x = enemies[i].path_x[enemies[i].steps];
+                    enemies[i].y = enemies[i].path_y[enemies[i].steps];
+                    enemies[i].steps--;
+                }
             }else{
-                enemies[i].x = enemies[i].path_x[enemies[i].steps];
-                enemies[i].y = enemies[i].path_y[enemies[i].steps];
-                enemies[i].steps--;
+                enemies[i].movment--;
             }
         }
         map2[enemies[i].x][enemies[i].y] = 1;
