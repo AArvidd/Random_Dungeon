@@ -10,10 +10,13 @@
 #define width 100
 #define height 100
 
-#define world_width 50
-#define world_height 50
+#define world_width 7
+#define world_height 7
 
 #define queue_lenth 200
+
+#define max_bolts 50
+#define bolt_flag 1 << 31
 
 #define search_cross 4
 #define search_full 8
@@ -40,6 +43,7 @@ typedef enum{
     golem,
     bicorn,
     lion,
+    wizard,
 
     enemies_types_amount,
 
@@ -106,19 +110,29 @@ typedef struct{
     int seen;
     int type;
     int movment;
+    int flags;
+    int timer;
 }enemies_t;
 
-int map1[width][height];
-int map2[width][height];
-int map3[width][height];
-int map4[width][height];
+typedef struct{
+    int x;
+    int y;
+    int dir_x;
+    int dir_y;
+    int damage;
+}bolt_t;
+
+int map1[width][height];    // terain
+int map2[width][height];    // enteties
+int map3[width][height];    // visibility
+int map4[width][height];    // enemy path finding
 
 int world_pos_x;
 int world_pos_y;
 
 int map_mode = 0;
 
-world_tile_t world_map[50][50];
+world_tile_t world_map[world_width][world_height];
 
 player_t player = {.damage = 2, .hp = 20};
 
@@ -131,7 +145,10 @@ enemies_type_t enemies_types[] = {
     {.damage = 2, .hp = 20, .spead = 2, .movment_option = 4, .movement_x = {-1,  1,  0,  0}, .movement_y = {0,  0, -1,  1}},
     {.damage = 1, .hp =  8, .spead = 0, .movment_option = 8, .movement_x = {-1,  1,  1, -1,  2, -2,  2, -2}, .movement_y = {-2,  2, -2,  2, -1,  1,  1, -1}},
     {.damage = 2, .hp =  8, .spead = 0, .movment_option = 8, .movement_x = {-2,  2,  0,  0, -1,  1,  0,  0}, .movement_y = { 0,  0, -2,  2,  0,  0, -1,  1}},
+    {.damage = 2, .hp =  5, .spead = 1, .movment_option = 4, .movement_x = {-1,  1,  0,  0}, .movement_y = {0,  0, -1,  1}},
 };
+
+bolt_t bolts[max_bolts];
 
 int spatern_x[] = {-1,  1,  0,  0, -1,  1, -1,  1};
 int spatern_y[] = { 0,  0, -1,  1, -1, -1,  1,  1};
@@ -145,6 +162,18 @@ queue_t queue = {
     .curent = 0,
     .next_empty = 0
 };
+
+int is_solid(int x, int y){
+    if( map1[x][y] == tile_rock     ||
+        map1[x][y] == tile_hardrock ||
+        map1[x][y] == tile_wall     ||
+        x < 0 || x > width - 1      ||
+        y < 0 || y > height - 1
+    ){
+        return 1;
+    }
+    return 0;
+}
 
 //world map generation
 void hunt_and_kill(int current_x, int current_y){
@@ -702,7 +731,7 @@ void dungeon_gen(int acces){
 
 void enemies_gen(){
     aktive_enemies = 0;
-    for(int i = 0; i < 10; i++){
+    for(int i = 0; i < 20; i++){
         int x = rand() % width;
         int y = rand() % height;
         while(map1[x][y] != 0 || map2[x][y] != 0){
@@ -710,10 +739,20 @@ void enemies_gen(){
             y = rand() % height;    
         }
         int type = rand() % (enemies_types_amount - 1) + 1;
-        // int type = 4;
+        // int type = wizard;
+        int movment = rand() % (enemies_types[type].spead + 1);
         enemies[i] = (enemies_t){.hp = enemies_types[type].hp, .x = x, .y = y, .steps = -1, .type = type};
-        map2[x][y] = 1;
+        map2[x][y] = type;
         aktive_enemies++;
+    }
+}
+
+void plase_player(){
+    player.x = rand() % width;
+    player.y = rand() % height;
+    while(map1[player.x][player.y] != 0){
+        player.x = rand() % width;
+        player.y = rand() % height;    
     }
 }
 
@@ -745,15 +784,6 @@ float distens(int x1, int y1, int x2, int y2){
     y *= y;
 
     return sqrt(x + y);
-}
-
-void plase_player(){
-    player.x = rand() % width;
-    player.y = rand() % height;
-    while(map1[player.x][player.y] != 0){
-        player.x = rand() % width;
-        player.y = rand() % height;    
-    }
 }
 
 int move_player(){
@@ -803,7 +833,7 @@ int move_player(){
     }
 
     if(map_mode == map_normal){
-        if(map2[player.x + spatern_x[dir]][player.y + spatern_y[dir]] != 0){
+        if(map2[player.x + spatern_x[dir]][player.y + spatern_y[dir]] != 0 && !(map2[player.x + spatern_x[dir]][player.y + spatern_y[dir]] & bolt_flag)){
             int i;
             for(i = 0; i < aktive_enemies; i++){
                 if(enemies[i].x == player.x + spatern_x[dir] && enemies[i].y == player.y + spatern_y[dir] && enemies[i].hp > 0){
@@ -816,13 +846,7 @@ int move_player(){
                 map2[enemies[i].x][enemies[i].y] = 0;
             }
             uppdate = 1;
-        }else if(
-           (map1[player.x + spatern_x[dir]][player.y + spatern_y[dir]] == tile_floor ||
-            map1[player.x + spatern_x[dir]][player.y + spatern_y[dir]] == tile_door  ||
-            map1[player.x + spatern_x[dir]][player.y + spatern_y[dir]] == tile_exit) && 
-            !(player.x + spatern_x[dir] < 0 || player.x + spatern_x[dir] > width - 1 || 
-            player.y + spatern_y[dir] < 0 || player.y + spatern_y[dir] > height - 1)
-        ){
+        }else if(!is_solid(player.x + spatern_x[dir], player.y + spatern_y[dir])){
             player.x += spatern_x[dir];
             player.y += spatern_y[dir];
             uppdate = 1;
@@ -852,6 +876,107 @@ int move_player(){
     }
 
     return uppdate;
+}
+
+void bolt_spawn(int x, int y, int dir_x, int dir_y, int damage){
+    for(int i = 0; i < max_bolts; i++){
+        if(bolts[i].damage == 0){
+            bolts[i] = (bolt_t){.x = x, .y = y, .dir_x = dir_x, .dir_y = dir_y, .damage = damage};
+            return;
+        }
+    }
+}
+
+void bolt_uppdate(){
+    for(int i = 0; i < max_bolts; i++){
+        if(bolts[i].damage == 0){
+            continue;
+        }
+
+        int dx = abs(bolts[i].dir_x);
+        int dy = abs(bolts[i].dir_y);
+        int next_x = bolts[i].x + bolts[i].dir_x;
+        int next_y = bolts[i].y + bolts[i].dir_y;
+        int x_inc = (next_x > bolts[i].x) ? 1 : -1;
+        int y_inc = (next_y > bolts[i].y) ? 1 : -1;
+
+        int error = dx - dy;
+        int n = dx + dy;
+
+        dx *= 2;
+        dy *= 2;
+
+        for(; n > 0; --n){
+            if(error > 0){
+                bolts[i].x += x_inc;
+                error -= dy;
+            }else if(error < 0){
+                bolts[i].y += y_inc;
+                error += dx;
+            }else{
+                bolts[i].x += x_inc;
+                bolts[i].y += y_inc;
+                error -= dy;
+                error += dx;
+                --n;
+            }
+
+            if(is_solid(bolts[i].x, bolts[i].y) || map1[bolts[i].x][bolts[i].y] == tile_door){
+                bolts[i].damage = 0;
+            }else if(map2[bolts[i].x][bolts[i].y]){
+                for(int j = 0; j < aktive_enemies; j++){
+                    if(enemies[j].x == bolts[i].x && enemies[j].y == bolts[i].y){
+                        enemies[j].hp -= bolts[i].damage;
+                        bolts[i].damage = 0;
+                        if(enemies[j].hp <= 0){
+                            map2[enemies[j].x][enemies[j].y] = 0;
+                        }
+                        break;
+                    }
+                }
+            }else if(bolts[i].x == player.x && bolts[i].y == player.y){
+                player.hp -= bolts[i].damage;
+                bolts[i].damage = 0;
+            }
+            if(bolts[i].damage == 0){
+                for(int x = -4; x < 5; x++){
+                    for(int y = -4; y < 5; y++){
+                        if(distens(bolts[i].x, bolts[i].y, bolts[i].x + x, bolts[i].y + y) < (random() % 4) + 1){
+                            map4[bolts[i].x + x][bolts[i].y + y] = 1;
+                        }
+                    }
+                }
+                break;
+            }
+
+        }
+        map2[bolts[i].x][bolts[i].y] = 1 | bolt_flag;
+
+    }
+}
+
+void explotion(){
+    for(int x = 0; x < width; x++){
+        for(int y = 0; y < height; y++){
+            if(map4[x][y]){
+                if(map1[x][y] != tile_exit){
+                    map1[x][y] = tile_floor;
+                }
+                if(map2[x][y] && !(map2[x][y] & bolt_flag)){
+
+                    for(int i = 0; i < aktive_enemies; i++){
+                        if(enemies[i].x == x && enemies[i].y == y){
+                            enemies[i].hp--;
+                            break;
+                        }
+                    }
+
+                }else if(player.x == x && player.y == y){
+                    player.hp--;
+                }
+            }
+        }
+    }
 }
 
 void enemies_pathfinding(int i){
@@ -987,12 +1112,30 @@ void enemies_uppdete(){
             if(enemies[i].movment == 0){
                 enemies[i].movment = enemies_types[enemies[i].type].spead;
 
-                if(enemies[i].path_x[enemies[i].steps] == player.x && enemies[i].path_y[enemies[i].steps] == player.y){
-                    player.hp -= enemies_types[enemies[i].type].damage;
+                if(enemies[i].type == wizard){
+                    if(map3[enemies[i].x][enemies[i].y] == 1 && 100/(distens(enemies[i].x, enemies[i].y, player.x, player.y) / 2 < random() % 10 + 1)){
+                        float disten = distens(enemies[i].x, enemies[i].y, player.x, player.y);
+                        float dir_x = (player.x - enemies[i].x) / disten;
+                        float dir_y = (player.y - enemies[i].y) / disten;
+                        dir_x *= 2;
+                        dir_y *= 2;
+                        dir_x = round(dir_x);
+                        dir_y = round(dir_y);
+                        bolt_spawn(enemies[i].x , enemies[i].y, dir_x, dir_y, enemies_types[enemies[i].type].damage);
+
+                    }else{
+                        enemies[i].x = enemies[i].path_x[enemies[i].steps];
+                        enemies[i].y = enemies[i].path_y[enemies[i].steps];
+                        enemies[i].steps--;
+                    }
                 }else{
-                    enemies[i].x = enemies[i].path_x[enemies[i].steps];
-                    enemies[i].y = enemies[i].path_y[enemies[i].steps];
-                    enemies[i].steps--;
+                    if(enemies[i].path_x[enemies[i].steps] == player.x && enemies[i].path_y[enemies[i].steps] == player.y){
+                        player.hp -= enemies_types[enemies[i].type].damage;
+                    }else{
+                        enemies[i].x = enemies[i].path_x[enemies[i].steps];
+                        enemies[i].y = enemies[i].path_y[enemies[i].steps];
+                        enemies[i].steps--;
+                    }
                 }
             }else{
                 enemies[i].movment--;
@@ -1056,24 +1199,44 @@ void draw_tile(int x, int y){
 void draw_enemie(int i){
     printf(" ");
     switch(i){
-        case 1:
+        case goblin:
             printf("\e[32mG");
             break;
-        case 2:
+        case golem:
             printf("\e[90m&");
             break;
-        case 3:
+        case bicorn:
             printf("\e[35mM");
             break;
-        case 4:
+        case lion:
             printf("\e[33mL");
+            break;
+        case wizard:
+            printf("\e[35mW");
             break;
 
         default:
             printf("\e[31m?");
             break;
     }
-    printf("\e[0m ");
+    printf(" \e[0m");
+}
+
+void draw_bolt(int x, int y){
+
+    printf(" \e[33mo\e[0m ");
+
+    // int i = 0;
+    // for(; i < max_bolts; i++){
+    //     if(bolts[i].x == x && bolts[i].y == y){
+    //         break;
+    //     }
+    // }
+
+    // float angle = atan2(bolts[i].dir_x, bolts[i].dir_y);
+
+   
+
 }
 
 void draw_map(){
@@ -1087,20 +1250,27 @@ void draw_map(){
         for(int y = 0; y < height; y++){
             printf("y = %2d:", y);
             for(int x = 0; x < width; x++){
+                if(map4[x][y]){
+                    printf("\x1b[43m");
+                }
                 if(x == player.x && y == player.y){
-                    printf(" \x1b[32m@\x1b[0m ");
+                    printf(" \x1b[32m@ \x1b[0m");
                     continue;
                 }
                 if(map3[x][y] == 1){
-                    if(map2[x][y] != 0){
+                    if(map2[x][y] & bolt_flag){
+                        draw_bolt(x, y);
+                    }else if(map2[x][y] != 0){
                         draw_enemie(map2[x][y]);
                     }else{
                         draw_tile(x, y);
                     }
                 }else{
-                    printf("   ");
+                    printf("\x1b[0m   ");
                 }
+                printf("\x1b[0m");
                 map3[x][y] = 0;
+                map4[x][y] = 0;
             }
             printf("\n");
         }
@@ -1271,6 +1441,8 @@ int main(){
                     scan(first_row);
                 }
                 enemies_uppdete();
+                bolt_uppdate();
+                explotion();
             }
             draw_map();
             printf("\x1b[f");
