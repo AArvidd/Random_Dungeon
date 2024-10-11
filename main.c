@@ -1362,7 +1362,7 @@ int get_tile(int x, int y){
 
     transform(x, y, &true_x, &true_y);
     if(true_x < 0 || true_x > width - 1 || true_y < 0 || true_y > height - 1){
-        return -1;
+        return 1;
     }
     if(map1[true_x][true_y] == tile_rock || map1[true_x][true_y] == tile_hardrock || map1[true_x][true_y] == tile_wall || map1[true_x][true_y] == tile_door){
         return 1;
