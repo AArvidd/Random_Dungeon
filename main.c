@@ -70,11 +70,34 @@ typedef struct{
 }world_tile_t;
 
 typedef struct{
+    char name[32];
+}items_t;
+
+typedef struct{
+    char name[32];
+    int type;
+}spels_t;
+
+typedef struct{
+    char name[32];
+}consumables_t;
+
+typedef struct{
+    items_t items[20];
+    spels_t spels[10];
+    consumables_t consumables[20];
+    int items_amount;
+    int spels_amount;
+    int consumables_amount;
+}inventory_t;
+
+typedef struct{
     int damage;
     int hp;
     int dir;
     int x;
     int y;
+    inventory_t inventory;
 }player_t;
 
 typedef struct{
@@ -123,9 +146,9 @@ typedef struct{
 }bolt_t;
 
 int map1[width][height];    // terain
-int map2[width][height];    // enteties
+int map2[width][height];    // enteties / data fore map generation
 int map3[width][height];    // visibility
-int map4[width][height];    // enemy path finding
+int map4[width][height];    // enemy path finding / other data
 
 int world_pos_x;
 int world_pos_y;
@@ -134,7 +157,7 @@ int map_mode = 0;
 
 world_tile_t world_map[world_width][world_height];
 
-player_t player = {.damage = 2, .hp = 20};
+player_t player = {.damage = 2, .hp = 20, .inventory = {.spels[0] = {.name = "Fierball"}, .spels_amount = 1}};
 
 enemies_t enemies[100];
 int aktive_enemies;
@@ -775,7 +798,9 @@ void map_gen(){
     add_hardrock();
 }
 
-//movment and map render
+//inventory system
+
+// enemy movment
 float distens(int x1, int y1, int x2, int y2){
     int x = x1 - x2;
     int y = y1 - y2;
@@ -784,98 +809,6 @@ float distens(int x1, int y1, int x2, int y2){
     y *= y;
 
     return sqrt(x + y);
-}
-
-int move_player(){
-    //map movment
-    int uppdate = 0;
-    char c;
-    int dir = -1;
-    c = getchar();
-    printf("\x1b[F \b");
-    switch(c){
-        case 'w':
-        case 'W':
-            dir = upp;
-            break;
-        
-        case 's':
-        case 'S':
-            dir = down;
-            break;
-        
-        case 'a':
-        case 'A':
-            dir = left;
-            break;
-        
-        case 'd':
-        case 'D':
-            dir = right;
-            break;
-        case 'e':
-        case 'E':
-            return -1;
-            break;
-        case ' ':
-            return 1;
-        case 'm':
-        case 'M':
-            if(map_mode == map_normal){
-                map_mode = map_world;
-            }else{
-                map_mode = map_normal;
-            }
-            printf("\x1b[1;1H\x1b[2J");
-            return 1;
-        default:
-            return 0;
-    }
-
-    if(map_mode == map_normal){
-        if(map2[player.x + spatern_x[dir]][player.y + spatern_y[dir]] != 0 && !(map2[player.x + spatern_x[dir]][player.y + spatern_y[dir]] & bolt_flag)){
-            int i;
-            for(i = 0; i < aktive_enemies; i++){
-                if(enemies[i].x == player.x + spatern_x[dir] && enemies[i].y == player.y + spatern_y[dir] && enemies[i].hp > 0){
-                    break;
-                }
-            }
-            enemies[i].hp -= player.damage;
-            if(enemies[i].hp <= 0){
-                player.hp += 6;
-                map2[enemies[i].x][enemies[i].y] = 0;
-            }
-            uppdate = 1;
-        }else if(!is_solid(player.x + spatern_x[dir], player.y + spatern_y[dir])){
-            player.x += spatern_x[dir];
-            player.y += spatern_y[dir];
-            uppdate = 1;
-        }
-
-        //world movment
-        if(map1[player.x][player.y] == tile_exit){
-            int dir;
-            if(player.x == 0){
-                world_pos_x--;
-                dir = 3;
-            }else if(player.x == width - 1){
-                world_pos_x++;
-                dir = 2;
-            }else if(player.y == 0){
-                world_pos_y--;
-                dir = 1;
-            }else if(player.y == height - 1){
-                world_pos_y++;
-                dir = 0;
-            }
-            map_gen();
-            player.x = world_map[world_pos_x][world_pos_y].exits_x[dir];
-            player.y = world_map[world_pos_x][world_pos_y].exits_y[dir];
-            uppdate = 1;
-        }
-    }
-
-    return uppdate;
 }
 
 void bolt_spawn(int x, int y, int dir_x, int dir_y, int damage){
@@ -1146,6 +1079,7 @@ void enemies_uppdete(){
     }
 }
 
+// map render
 void draw_wall(int x, int y){
     int type = 0;
 
@@ -1250,7 +1184,7 @@ void draw_map(){
         for(int y = 0; y < height; y++){
             printf("y = %2d:", y);
             for(int x = 0; x < width; x++){
-                if(map4[x][y]){
+                if(map4[x][y] == 1){
                     printf("\x1b[43m");
                 }
                 if(x == player.x && y == player.y){
@@ -1258,6 +1192,9 @@ void draw_map(){
                     continue;
                 }
                 if(map3[x][y] == 1){
+                    if(map4[x][y] == 2){
+                        printf("\x1b[41m");
+                    }
                     if(map2[x][y] & bolt_flag){
                         draw_bolt(x, y);
                     }else if(map2[x][y] != 0){
@@ -1269,8 +1206,6 @@ void draw_map(){
                     printf("\x1b[0m   ");
                 }
                 printf("\x1b[0m");
-                map3[x][y] = 0;
-                map4[x][y] = 0;
             }
             printf("\n");
         }
@@ -1300,6 +1235,372 @@ void draw_map(){
         }
     }
 
+}
+
+void clear_information(){
+    for(int x = 0; x < width; x++){
+        for(int y = 0; y < height; y++){
+            map3[x][y] = 0;
+            map4[x][y] = 0;
+        }
+    }
+}
+
+// player
+void draw_inventory(int type, int index){
+    printf("\x1b[1;1H\x1b[2J");
+    printf("Items:\n");
+    for(int i = 0; i < player.inventory.items_amount; i++){
+        if(type == 0 && index == i){
+            printf("\x1b[31m");
+        }
+        printf("%d: %s\x1b[0m\n", i + 1, player.inventory.items[i].name);
+    }
+    printf("\nSpels:\n");
+    for(int i = 0; i < player.inventory.spels_amount; i++){
+        if(type == 1 && index == i){
+            printf("\x1b[31m");
+        }
+        printf("%d: %s\x1b[0m\n", i + 1, player.inventory.spels[i].name);
+
+    }
+    printf("\nConsumables:\n");
+    for(int i = 0; i < player.inventory.consumables_amount; i++){
+        if(type == 2 && index == i){
+            printf("\x1b[31m");
+        }
+        printf("%d: %s\x1b[0m\n", i + 1, player.inventory.consumables[i].name);
+
+    }
+}
+
+void use_item(int index){
+    
+}
+
+void use_spel(int index){
+    int mode = 1;
+    int target_x = player.x;
+    int target_y = player.y;
+    int i = 0;
+    begining:;
+    if(mode){
+        for(; i <= aktive_enemies; i++){
+            if(map3[enemies[i].x][enemies[i].y] && enemies[i].hp > 0){
+                map4[enemies[i].x][enemies[i].y] = 2;
+                break;
+            }
+            if(i == aktive_enemies){
+                mode = 0;
+                goto begining;
+            }
+        }
+        char c;
+
+        while(1){
+            printf("\x1b[f");
+            draw_map();
+            c = getchar();
+            switch(c){
+                case 'a':
+                case 'A':{
+                    map4[enemies[i].x][enemies[i].y] = 0;
+                    i++;
+                    for(; map3[enemies[i].x][enemies[i].y] == 0 || enemies[i].hp <= 0; i++){
+                        if(i >= aktive_enemies){
+                            i = 0;
+                        }
+                    }
+                    map4[enemies[i].x][enemies[i].y] = 2;
+                }break;
+
+                case 'd':
+                case 'D':{
+                    map4[enemies[i].x][enemies[i].y] = 0;
+                    i--;
+                    for(; map3[enemies[i].x][enemies[i].y] == 0 || enemies[i].hp <= 0; i--){
+                        if(i < 0){
+                            i = aktive_enemies;
+                        }
+                    }
+                    map4[enemies[i].x][enemies[i].y] = 2;
+                }break;
+
+                case '\n':
+                    target_x = enemies[i].x;
+                    target_y = enemies[i].y;
+                    goto exit;
+
+                case 'e':
+                case 'E':
+                    return;
+
+                case 'm':
+                case 'M':
+                    map4[enemies[i].x][enemies[i].y] = 0;
+                    mode = 0;
+                    goto begining;
+            }
+        }
+    }else{
+        while(1){
+            printf("\x1b[f");
+            draw_map();
+            char c = getchar();
+            int dir = 0;
+            switch(c){
+                case 'w':
+                case 'W':
+                    dir = upp;
+                    break;
+                
+                case 'a':
+                case 'A':
+                    dir = left;
+                    break;
+                
+                case 's':
+                case 'S':
+                    dir = down;
+                    break;
+
+                case 'd':
+                case 'D':
+                    dir = right;
+                    break;
+
+                case '\n':
+                    goto exit;
+
+                case 'e':
+                case 'E':
+                    return;
+
+                case 'm':
+                case 'M':
+                    map4[target_x][target_y] = 0;
+                    mode = 1;
+                    goto begining;
+
+                default:
+                    continue;
+            }
+
+            if(map3[target_x + spatern_x[dir]][target_y + spatern_y[dir]] == 1){
+                map4[target_x][target_y] = 0;
+                target_x += spatern_x[dir];
+                target_y += spatern_y[dir];
+                map4[target_x][target_y] = 2;
+            }
+
+        }
+    }
+    exit:;
+
+    switch(player.inventory.spels[index].type){
+        case 0:{
+            float disten = distens(target_x, target_y, player.x, player.y);
+            float dir_x = (target_x - player.x) / disten;
+            float dir_y = (target_y - player.y) / disten;
+            dir_x *= 2;
+            dir_y *= 2;
+            dir_x = round(dir_x);
+            dir_y = round(dir_y);
+            bolt_spawn(player.x , player.y, dir_x, dir_y, player.damage);
+        }break;
+    }
+}
+
+void use_consumables(int index){
+
+}
+
+void inventory_run(){
+    int marker_type = 0;
+    int marker_index = 0;
+    if(player.inventory.items_amount == 0){
+        marker_type = 1;
+    }
+    if(player.inventory.spels_amount == 0 && marker_type == 1){
+        marker_type = 2;
+    }
+    if(player.inventory.consumables_amount == 0 && marker_type == 2){
+        return;
+    }
+    while(1){
+        draw_inventory(marker_type, marker_index);
+        int c = getchar();
+        switch(c){
+            case 's':
+            case 'S':{
+                marker_index++;
+                if(marker_type == 0 && marker_index == player.inventory.items_amount){
+                    marker_index = 0;
+                    marker_type++;
+                }
+                if(marker_type == 1 && marker_index == player.inventory.spels_amount){
+                    if(player.inventory.consumables_amount == 0){
+                        marker_index = player.inventory.spels_amount - 1;
+                        if(marker_index == -1){
+                            marker_type = 0;
+                            marker_index = player.inventory.items_amount -1;
+                        }
+                    }else{
+                        marker_index = 0;
+                        marker_type++;
+                    }
+                }
+                if(marker_type == 2 && marker_index == player.inventory.consumables_amount){
+                    marker_index--;
+                }
+            }break;
+
+            case 'w':
+            case 'W':{
+                marker_index--;
+                if(marker_type == 2 && marker_index == -1){
+                    marker_index = player.inventory.spels_amount - 1;
+                    marker_type--;
+                }
+                if(marker_type == 1 && marker_index == -1){
+                    if(player.inventory.items_amount == 0){
+                        marker_index = 0;
+                        if(marker_index == player.inventory.spels_amount){
+                            marker_type = 2;
+                            marker_index = 0;
+                        }
+                    }else{
+                        marker_index = player.inventory.items_amount - 1;
+                        marker_type--;
+                    }
+                }
+                if(marker_type == 0 && marker_index == -1){
+                    marker_index = 0;
+                }
+            }break;
+
+            case '\n':
+                switch(marker_type){
+                    case 0:
+                        use_item(marker_index);
+                        break;
+                    case 1:
+                        use_spel(marker_index);
+                        break;
+                    case 2:
+                        use_consumables(marker_index);
+                        break;
+                }
+                printf("\x1b[1;1H\x1b[2J");
+            return;
+            
+            case 'e':
+            case 'E':
+                printf("\x1b[1;1H\x1b[2J");
+                return;
+        }
+    }
+}
+
+int move_player(){
+    //map movment
+    int uppdate = 0;
+    char c;
+    int dir = -1;
+    c = getchar();
+    printf("\x1b[F \b");
+    switch(c){
+        case 'w':
+        case 'W':
+            dir = upp;
+            break;
+        
+        case 's':
+        case 'S':
+            dir = down;
+            break;
+        
+        case 'a':
+        case 'A':
+            dir = left;
+            break;
+        
+        case 'd':
+        case 'D':
+            dir = right;
+            break;
+
+        case 'e':
+        case 'E':
+            return -1;
+        
+        case ' ':
+            return 1;
+        
+        case 'm':
+        case 'M':
+            if(map_mode == map_normal){
+                map_mode = map_world;
+            }else{
+                map_mode = map_normal;
+            }
+            printf("\x1b[1;1H\x1b[2J");
+            return 1;
+        
+        case 'i':
+        case 'I':
+            inventory_run();
+            return 1;
+
+
+        default:
+            return 0;
+    }
+
+    if(map_mode == map_normal){
+        if(map2[player.x + spatern_x[dir]][player.y + spatern_y[dir]] != 0 && !(map2[player.x + spatern_x[dir]][player.y + spatern_y[dir]] & bolt_flag)){
+            int i;
+            for(i = 0; i < aktive_enemies; i++){
+                if(enemies[i].x == player.x + spatern_x[dir] && enemies[i].y == player.y + spatern_y[dir] && enemies[i].hp > 0){
+                    break;
+                }
+            }
+            enemies[i].hp -= player.damage;
+            if(enemies[i].hp <= 0){
+                player.hp += 6;
+                map2[enemies[i].x][enemies[i].y] = 0;
+            }
+            uppdate = 1;
+        }else if(!is_solid(player.x + spatern_x[dir], player.y + spatern_y[dir])){
+            player.x += spatern_x[dir];
+            player.y += spatern_y[dir];
+            uppdate = 1;
+        }
+
+        //world movment
+        if(map1[player.x][player.y] == tile_exit){
+            int dir;
+            if(player.x == 0){
+                world_pos_x--;
+                dir = 3;
+            }else if(player.x == width - 1){
+                world_pos_x++;
+                dir = 2;
+            }else if(player.y == 0){
+                world_pos_y--;
+                dir = 1;
+            }else if(player.y == height - 1){
+                world_pos_y++;
+                dir = 0;
+            }
+            map_gen();
+            player.x = world_map[world_pos_x][world_pos_y].exits_x[dir];
+            player.y = world_map[world_pos_x][world_pos_y].exits_y[dir];
+            uppdate = 1;
+        }
+    }
+
+    return uppdate;
 }
 
 //visebilytty 
@@ -1434,6 +1735,7 @@ int main(){
         if(action == -1){
             break;
         }else if(action){
+            clear_information();
             if(map_mode == map_normal){
                 for(int i = 0; i < search_cross; i++){
                     player.dir = i;
