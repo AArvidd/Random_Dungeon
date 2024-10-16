@@ -21,6 +21,8 @@
 #define search_cross 4
 #define search_full 8
 
+#define full_bright 0
+
 typedef enum{
     tile_floor,
     tile_rock,
@@ -762,7 +764,7 @@ void enemies_gen(){
             y = rand() % height;    
         }
         int type = rand() % (enemies_types_amount - 1) + 1;
-        // int type = wizard;
+        // int type = bicorn;
         int movment = rand() % (enemies_types[type].spead + 1);
         enemies[i] = (enemies_t){.hp = enemies_types[type].hp, .x = x, .y = y, .steps = -1, .type = type};
         map2[x][y] = type;
@@ -797,8 +799,6 @@ void map_gen(){
     enemies_gen();
     add_hardrock();
 }
-
-//inventory system
 
 // enemy movment
 float distens(int x1, int y1, int x2, int y2){
@@ -838,6 +838,11 @@ void bolt_uppdate(){
 
         dx *= 2;
         dy *= 2;
+
+        if(n == 0){
+            n = 1;
+            bolts[i].damage = 0;
+        }
 
         for(; n > 0; --n){
             if(error > 0){
@@ -892,7 +897,7 @@ void explotion(){
     for(int x = 0; x < width; x++){
         for(int y = 0; y < height; y++){
             if(map4[x][y]){
-                if(map1[x][y] != tile_exit){
+                if(map1[x][y] != tile_exit && map1[x][y] != tile_hardrock){
                     map1[x][y] = tile_floor;
                 }
                 if(map2[x][y] && !(map2[x][y] & bolt_flag)){
@@ -945,20 +950,14 @@ void enemies_pathfinding(int i){
             break;
         }
 
-        if( map1[queue.queue_x[next]][queue.queue_y[next]] == tile_rock ||
-            map1[queue.queue_x[next]][queue.queue_y[next]] == tile_hardrock ||
-            map1[queue.queue_x[next]][queue.queue_y[next]] == tile_wall ||
-            map2[queue.queue_x[next]][queue.queue_y[next]] != 0 ||
-            queue.queue_x[next] < 0 || queue.queue_x[next] > width - 1 || 
-            queue.queue_y[next] < 0 || queue.queue_y[next] > height - 1
-        ){
+        if(is_solid(queue.queue_x[next], queue.queue_y[next]) || map2[queue.queue_x[next]][queue.queue_y[next]] != 0){
             queue.queue_x[next] = -1;
             queue.queue_y[next] = -1;
             continue;
         }
 
         for(int j = 0; j < enemies_types[enemies[i].type].movment_option; j++){
-            
+
             if(enemies[i].to_x == queue.queue_x[next] + enemies_types[enemies[i].type].movement_x[j] && enemies[i].to_y == queue.queue_y[next] + enemies_types[enemies[i].type].movement_y[j]){
                 map4[enemies[i].to_x][enemies[i].to_y] = j ^ 1;
                 goto exit;
@@ -1028,9 +1027,16 @@ void enemies_uppdete(){
     }
 
     for(int i = 0; i < aktive_enemies; i++){
+        if(enemies[i].hp > 0){
+            map2[enemies[i].x][enemies[i].y] = enemies[i].type;
+        }
+    }
+
+    for(int i = 0; i < aktive_enemies; i++){
         if(enemies[i].hp <= 0){
             continue;
         }
+        map2[enemies[i].x][enemies[i].y] = 0;
         if(map3[enemies[i].x][enemies[i].y] == 1 || enemies[i].seen){
             enemies[i].to_x = player.x;
             enemies[i].to_y = player.y;
@@ -1046,7 +1052,7 @@ void enemies_uppdete(){
                 enemies[i].movment = enemies_types[enemies[i].type].spead;
 
                 if(enemies[i].type == wizard){
-                    if(map3[enemies[i].x][enemies[i].y] == 1 && 100/(distens(enemies[i].x, enemies[i].y, player.x, player.y) / 2 < random() % 10 + 1)){
+                    if(map3[enemies[i].x][enemies[i].y] == 1 && 100/(distens(enemies[i].x, enemies[i].y, player.x, player.y) / 2) > random() % 40 + 1){
                         float disten = distens(enemies[i].x, enemies[i].y, player.x, player.y);
                         float dir_x = (player.x - enemies[i].x) / disten;
                         float dir_y = (player.y - enemies[i].y) / disten;
@@ -1056,6 +1062,8 @@ void enemies_uppdete(){
                         dir_y = round(dir_y);
                         bolt_spawn(enemies[i].x , enemies[i].y, dir_x, dir_y, enemies_types[enemies[i].type].damage);
 
+                    }else if(map2[enemies[i].path_x[enemies[i].steps]][enemies[i].path_y[enemies[i].steps]] && !(map2[enemies[i].path_x[enemies[i].steps]][enemies[i].path_y[enemies[i].steps]] & bolt_flag)){
+                        enemies_pathfinding(i);
                     }else{
                         enemies[i].x = enemies[i].path_x[enemies[i].steps];
                         enemies[i].y = enemies[i].path_y[enemies[i].steps];
@@ -1064,6 +1072,8 @@ void enemies_uppdete(){
                 }else{
                     if(enemies[i].path_x[enemies[i].steps] == player.x && enemies[i].path_y[enemies[i].steps] == player.y){
                         player.hp -= enemies_types[enemies[i].type].damage;
+                    }else if(map2[enemies[i].path_x[enemies[i].steps]][enemies[i].path_y[enemies[i].steps]] && !(map2[enemies[i].path_x[enemies[i].steps]][enemies[i].path_y[enemies[i].steps]] & bolt_flag)){
+                        enemies_pathfinding(i);
                     }else{
                         enemies[i].x = enemies[i].path_x[enemies[i].steps];
                         enemies[i].y = enemies[i].path_y[enemies[i].steps];
@@ -1073,6 +1083,9 @@ void enemies_uppdete(){
             }else{
                 enemies[i].movment--;
             }
+        }
+        if(map2[enemies[i].x][enemies[i].y]){
+            map4[enemies[i].x][enemies[i].y] = 2;
         }
         map2[enemies[i].x][enemies[i].y] = enemies[i].type;
 
@@ -1108,7 +1121,11 @@ void draw_wall(int x, int y){
 void draw_tile(int x, int y){
     switch(map1[x][y]){
         case tile_floor:
-            printf(" . ");
+            if(full_bright){
+                printf("   ");
+            }else{
+                printf(" . ");
+            }
             break;
         case tile_rock:
             printf(" # ");
@@ -1191,7 +1208,7 @@ void draw_map(){
                     printf(" \x1b[32m@ \x1b[0m");
                     continue;
                 }
-                if(map3[x][y] == 1){
+                if(map3[x][y] == 1 || full_bright){
                     if(map4[x][y] == 2){
                         printf("\x1b[41m");
                     }
