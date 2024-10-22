@@ -16,7 +16,14 @@
 #define queue_lenth 200
 
 #define max_bolts 50
-#define bolt_flag 1 << 31
+
+#define bolt_flag (1 << 31)
+#define item_flag (1 << 30)
+#define consumables_flag (1 << 29)
+#define all_flages (bolt_flag | item_flag | consumables_flag) 
+
+#define max_items 50
+#define inventory_size 20
 
 #define search_cross 4
 #define search_full 8
@@ -72,7 +79,17 @@ typedef struct{
 }world_tile_t;
 
 typedef struct{
-    char name[32];
+    char* name;
+    int hp;
+    int hp_regen;
+    int attack; 
+    int mp;
+    int mp_regen;
+    int defense;
+    int slots;
+    int x;
+    int y;
+    int aktive;
 }items_t;
 
 typedef struct{
@@ -81,13 +98,17 @@ typedef struct{
 }spels_t;
 
 typedef struct{
-    char name[32];
+    char* name;
+    int hp;
+    int mp;
+    int x;
+    int y;
 }consumables_t;
 
 typedef struct{
-    items_t items[20];
+    items_t items[inventory_size];
     spels_t spels[10];
-    consumables_t consumables[20];
+    consumables_t consumables[inventory_size];
     int items_amount;
     int spels_amount;
     int consumables_amount;
@@ -95,11 +116,18 @@ typedef struct{
 
 typedef struct{
     int damage;
+    int defense;
     int hp;
+    int mp;
+    int max_hp;
+    int max_mp;
+    int hp_regen;
+    int mp_regen;
     int dir;
     int x;
     int y;
     inventory_t inventory;
+    int equipment[7]; 
 }player_t;
 
 typedef struct{
@@ -174,6 +202,26 @@ enemies_type_t enemies_types[] = {
 };
 
 bolt_t bolts[max_bolts];
+
+items_t items[max_items];
+consumables_t consumables[max_items];
+
+char* item_names[] = {
+    "Sword          ",
+    "Shield         ", 
+    "Greatsword     ", 
+    "Warhammer      ", 
+    "Plait mail     ", 
+    "Chain mail     ", 
+    "Mage robe      ", 
+    "Boots          ", 
+    "Helmet         ", 
+    "Pointy hat     ", 
+    "Healing ring   ", 
+    "Magic ring     ", 
+    "Ring of Defense", 
+    "Ring of Offense"};
+char* consumabals_names[] = {"Stake", "Potion", "Soup", "Scrolls"};
 
 int spatern_x[] = {-1,  1,  0,  0, -1,  1, -1,  1};
 int spatern_y[] = { 0,  0, -1,  1, -1, -1,  1,  1};
@@ -801,6 +849,136 @@ void map_gen(){
 }
 
 // enemy movment
+void kill_enemie(int i){
+    map2[enemies[i].x][enemies[i].y] = 0;
+    if(rand() % 3 && 0){
+        return;
+    }
+    int value = rand() % 15 + 2;
+    if(rand() % 2 && 0){
+        int temp[2];
+        int first = rand() % 2;
+        temp[first] = rand() % value;
+        value -= temp[first];
+        temp[!first] = rand() % value;
+
+        consumables_t consumables_temp = {.hp = temp[0], .mp = temp[1], .name = consumabals_names[rand() % 4], .x = enemies[i].x, .y = enemies[i].y};
+
+        for(int j = 0; j < max_items; j++){
+            if(consumables[j].hp == 0 && consumables[i].mp == 0){
+                consumables[j] = consumables_temp;
+                map2[enemies[i].x][enemies[i].y] = j | consumables_flag;
+                return;
+            }
+        }
+
+    }else{
+        int slots = 0;
+        int hp = 0;
+        int hp_regen = 0;
+        int attack = 0; 
+        int mp = 0;
+        int mp_regen = 0;
+        int defense = 0;
+        char* name;
+
+        switch(rand() % 7){
+            case 0:{ // main hand
+                slots = 1;
+                attack = rand() % 15 + 1;
+                if(rand() % 2){
+                    defense = rand() % 5;
+                }
+                name = item_names[0];
+            }break;
+            case 1:{ // off hand
+                slots = 2;
+                defense = rand() % 15 + 1;
+                if(rand() % 2){
+                    attack = rand() % 5;
+                }
+                name = item_names[1];
+            }break;
+            case 2:{ // doule hand
+                slots = 3;
+                attack = rand() % 15 + 10;
+                name = item_names[rand() % 2 + 2];
+            }break;
+            case 3:{ // armor
+                slots = 4;
+                if(rand() % 2){
+                    hp = rand() % 15 + 1;
+                    defense = rand() % 10 + 1;
+                    name = item_names[rand() % 2 +4];
+                }else{
+                    hp = rand() % 5 + 1;
+                    mp = rand() % 15 + 10;
+                    mp_regen = rand() % 5;
+                    name = item_names[6];
+                }
+            }break;
+            case 4:{ // bots
+                slots = 8;
+                if(rand() % 2){
+                    hp = rand() % 10 + 1;
+                    defense = rand() % 5 + 1;
+                }else{
+                    hp = rand() % 3 + 1;
+                    mp = rand() % 10 + 10;
+                    mp_regen = rand() % 3;
+                }
+                name = item_names[7];
+            }break;
+            case 5:{ // helmet
+                slots = 16;
+                if(rand() % 2){
+                    hp = rand() % 10 + 1;
+                    defense = rand() % 5 + 1;
+                    name = item_names[8];
+                }else{
+                    hp = rand() % 3 + 1;
+                    mp = rand() % 10 + 10;
+                    mp_regen = rand() % 3;
+                    name = item_names[9];
+                }
+            }break;
+            case 6:{ // rings
+                slots = 32;
+                switch(rand() % 4){
+                    case 0:{ // hp
+                        hp = rand() % 10 + 1;
+                        hp_regen = rand() % 5;
+                        name = item_names[10];
+                    }break;
+                    case 1:{ // mp
+                        mp = rand() % 10 + 1;
+                        mp_regen = rand() & 5;
+                        name = item_names[11];
+                    }break;
+                    case 2:{ // defense
+                        defense = rand() % 15 + 1;
+                        name = item_names[12];
+                    }break;
+                    case 3:{ // offens
+                        attack = rand() % 10 + 1;
+                        name = item_names[13];
+                    }break;
+                }
+            }break;
+        }
+
+        items_t item_temp = {.attack = attack, .defense = defense, .hp = hp, .hp_regen = hp_regen, .mp = mp, .mp_regen = mp_regen, .name = name, .slots = slots, .x = enemies[i].x, .y = enemies[i].y, .aktive = 1};
+
+        for(int j = 0; j < max_items; j++){
+            if(items[j].aktive == 0){
+                items[j] = item_temp;
+                map2[enemies[i].x][enemies[i].y] = j | item_flag;
+                return;
+            }
+        }
+    }
+}
+
 float distens(int x1, int y1, int x2, int y2){
     int x = x1 - x2;
     int y = y1 - y2;
@@ -867,7 +1045,7 @@ void bolt_uppdate(){
                         enemies[j].hp -= bolts[i].damage;
                         bolts[i].damage = 0;
                         if(enemies[j].hp <= 0){
-                            map2[enemies[j].x][enemies[j].y] = 0;
+                            kill_enemie(i);
                         }
                         break;
                     }
@@ -900,7 +1078,7 @@ void explotion(){
                 if(map1[x][y] != tile_exit && map1[x][y] != tile_hardrock){
                     map1[x][y] = tile_floor;
                 }
-                if(map2[x][y] && !(map2[x][y] & bolt_flag)){
+                if(map2[x][y] && !(map2[x][y] & all_flages)){
 
                     for(int i = 0; i < aktive_enemies; i++){
                         if(enemies[i].x == x && enemies[i].y == y){
@@ -1062,7 +1240,7 @@ void enemies_uppdete(){
                         dir_y = round(dir_y);
                         bolt_spawn(enemies[i].x , enemies[i].y, dir_x, dir_y, enemies_types[enemies[i].type].damage);
 
-                    }else if(map2[enemies[i].path_x[enemies[i].steps]][enemies[i].path_y[enemies[i].steps]] && !(map2[enemies[i].path_x[enemies[i].steps]][enemies[i].path_y[enemies[i].steps]] & bolt_flag)){
+                    }else if(map2[enemies[i].path_x[enemies[i].steps]][enemies[i].path_y[enemies[i].steps]] && !(map2[enemies[i].path_x[enemies[i].steps]][enemies[i].path_y[enemies[i].steps]] & all_flages)){
                         enemies_pathfinding(i);
                     }else{
                         enemies[i].x = enemies[i].path_x[enemies[i].steps];
@@ -1071,8 +1249,12 @@ void enemies_uppdete(){
                     }
                 }else{
                     if(enemies[i].path_x[enemies[i].steps] == player.x && enemies[i].path_y[enemies[i].steps] == player.y){
-                        player.hp -= enemies_types[enemies[i].type].damage;
-                    }else if(map2[enemies[i].path_x[enemies[i].steps]][enemies[i].path_y[enemies[i].steps]] && !(map2[enemies[i].path_x[enemies[i].steps]][enemies[i].path_y[enemies[i].steps]] & bolt_flag)){
+                        int damage = enemies_types[enemies[i].type].damage - player.defense;
+                        if(damage < 1){
+                            damage = 1;
+                        }
+                        player.hp -= damage;
+                    }else if(map2[enemies[i].path_x[enemies[i].steps]][enemies[i].path_y[enemies[i].steps]] && !(map2[enemies[i].path_x[enemies[i].steps]][enemies[i].path_y[enemies[i].steps]] & all_flages)){
                         enemies_pathfinding(i);
                     }else{
                         enemies[i].x = enemies[i].path_x[enemies[i].steps];
@@ -1093,6 +1275,17 @@ void enemies_uppdete(){
 }
 
 // map render
+void plase_items(){
+    for(int i = 0; i < max_items; i++){
+        if(items[i].aktive){
+            map2[items[i].x][items[i].y] = i | item_flag;
+        }
+        if(consumables[i].hp || consumables[i].mp){
+            map2[consumables[i].x][consumables[i].y] = i | consumables_flag;
+        }
+    }
+}
+
 void draw_wall(int x, int y){
     int type = 0;
 
@@ -1204,16 +1397,20 @@ void draw_map(){
                 if(map4[x][y] == 1){
                     printf("\x1b[43m");
                 }
+                if(map4[x][y] == 2){
+                    printf("\x1b[41m");
+                }
                 if(x == player.x && y == player.y){
-                    printf(" \x1b[32m@ \x1b[0m");
+                    printf("\x1b[32m @ \x1b[0m");
                     continue;
                 }
                 if(map3[x][y] == 1 || full_bright){
-                    if(map4[x][y] == 2){
-                        printf("\x1b[41m");
-                    }
                     if(map2[x][y] & bolt_flag){
                         draw_bolt(x, y);
+                    }else if(map2[x][y] & item_flag){
+                        printf("\x1b[90m § \x1b[0m");
+                    }else if(map2[x][y] & consumables_flag){
+                        printf("\x1b[90m %c \x1b[0m", '%');
                     }else if(map2[x][y] != 0){
                         draw_enemie(map2[x][y]);
                     }else{
@@ -1226,7 +1423,10 @@ void draw_map(){
             }
             printf("\n");
         }
-        printf("\nMove: W, A, S, D   HP = %2d", player.hp);
+        printf("\nMove: W, A, S, D");
+        printf("   HP = %2d / %2d", player.hp, player.max_hp);
+        printf("   MP = %2d / %2d", player.mp, player.max_mp);
+        printf("   Damage = %2d   Defense = %2d", player.damage, player.defense);
         printf("\n");
 
     }else if(map_mode == map_world){
@@ -1271,14 +1471,75 @@ void draw_inventory(int type, int index){
         if(type == 0 && index == i){
             printf("\x1b[31m");
         }
-        printf("%d: %s\x1b[0m\n", i + 1, player.inventory.items[i].name);
+        printf("%2d: %s (", i + 1, player.inventory.items[i].name);
+
+        int later = 0;
+
+        items_t item_temp = player.inventory.items[i]; 
+
+        if(item_temp.attack){
+            printf("Attack = %d", item_temp.attack);
+            later = 1;
+        }
+        if(item_temp.defense){
+            if(later){
+                printf(", ");
+            }
+            printf("Defense = %d", item_temp.defense);
+            later = 1;
+        }
+        if(item_temp.hp){
+            if(later){
+                printf(", ");
+            }
+            printf("hp = %d", item_temp.hp);
+            later = 1;
+        }
+        if(item_temp.hp_regen){
+            if(later){
+                printf(", ");
+            }
+            printf("hp regeneration = %d", item_temp.hp_regen);
+            later = 1;
+        }
+        if(item_temp.mp){
+            if(later){
+                printf(", ");
+            }
+            printf("mp = %d", item_temp.mp);
+            later = 1;
+        }
+        if(item_temp.mp_regen){
+            if(later){
+                printf(", ");
+            }
+            printf("mp regeneration = %d", item_temp.mp_regen);
+            later = 1;
+        }
+        printf(")");
+
+        if(item_temp.slots == 32){
+            if(player.equipment[5] == i || player.equipment[6] == i){
+                printf(" X");
+            }
+        }else{
+            for(int j = 0; j < 5; j++){
+                if(item_temp.slots & 1 << j && player.equipment[j] == i){
+                    printf(" X");
+                    break;
+                }
+            }
+        }
+
+        printf("\x1b[0m\n");
     }
+
     printf("\nSpels:\n");
     for(int i = 0; i < player.inventory.spels_amount; i++){
         if(type == 1 && index == i){
             printf("\x1b[31m");
         }
-        printf("%d: %s\x1b[0m\n", i + 1, player.inventory.spels[i].name);
+        printf("%2d: %s\x1b[0m\n", i + 1, player.inventory.spels[i].name);
 
     }
     printf("\nConsumables:\n");
@@ -1286,13 +1547,106 @@ void draw_inventory(int type, int index){
         if(type == 2 && index == i){
             printf("\x1b[31m");
         }
-        printf("%d: %s\x1b[0m\n", i + 1, player.inventory.consumables[i].name);
+        printf("%2d: %s (", i + 1, player.inventory.consumables[i].name);
+
+        if(player.inventory.consumables[i].hp){
+            printf("hp = %d", player.inventory.consumables[i].hp);
+        }
+        if(player.inventory.consumables[i].hp && player.inventory.consumables[i].mp){
+            printf(", ");
+        }
+        if(player.inventory.consumables[i].mp){
+            printf("mp = %d", player.inventory.consumables[i].mp);
+        }
+        printf(")\x1b[0m\n");
 
     }
 }
 
+void uppdate_player_stats(){
+    player.max_hp = 10;
+    player.max_mp = 0;
+    player.hp_regen = 0;
+    player.mp_regen = 0;
+    player.damage = 1;
+    player.defense = 0;
+
+    for(int i = 0; i < 7; i++){
+        if(player.equipment[i] == -1){
+            continue;
+        }
+        int test = 0;
+        for(int j = 0; j < i; j++){
+            if(player.equipment[j] == player.equipment[i]){
+                test = 1;
+                break;
+            }
+        }
+        if(test){
+            continue;
+        }
+        player.max_hp   += player.inventory.items[player.equipment[i]].hp;
+        player.max_mp   += player.inventory.items[player.equipment[i]].mp;
+        player.hp_regen += player.inventory.items[player.equipment[i]].hp_regen;
+        player.mp_regen += player.inventory.items[player.equipment[i]].mp_regen;
+        player.damage   += player.inventory.items[player.equipment[i]].attack;
+        player.defense  += player.inventory.items[player.equipment[i]].defense;
+    }
+
+    if(player.hp > player.max_hp){
+        player.hp = player.max_hp;
+    }
+    if(player.mp > player.max_mp){
+        player.mp = player.max_mp;
+    }
+
+}
+
 void use_item(int index){
-    
+    items_t item_temp = player.inventory.items[index];
+
+    int exit = 0;
+
+    if(item_temp.slots == 32){
+        if(player.equipment[5] == index){
+            player.equipment[5] = -1;
+            return;
+        }
+        if(player.equipment[6] == index){
+            player.equipment[6] = -1;
+            return;
+        }
+
+        if(player.equipment[5] == -1){
+            player.equipment[5] = index;
+            return;
+        }
+        if(player.equipment[6] == -1){
+            player.equipment[6] = index;
+        }
+        return;
+    }
+
+    for(int i = 0; i < 5; i++){
+        if(item_temp.slots & 1 << i){
+            if(player.equipment[i] != -1){
+                if(player.equipment[i] == index){
+                    player.equipment[i]  = -1;
+                }
+                exit = 1;
+            }
+        }
+    }
+
+    if(exit){
+        return;
+    }
+
+    for(int i = 0; i < 5; i++){
+        if(item_temp.slots & 1 << i){
+            player.equipment[i] = index;
+        }
+    }
 }
 
 void use_spel(int index){
@@ -1429,7 +1783,22 @@ void use_spel(int index){
 }
 
 void use_consumables(int index){
+    player.hp += player.inventory.consumables[index].hp;
+    player.mp += player.inventory.consumables[index].mp;
 
+    if(player.hp > player.max_hp){
+        player.hp = player.max_hp;
+    }
+    if(player.mp > player.max_mp){
+        player.mp = player.max_mp;
+    }
+
+    index++;
+    for(; index < inventory_size; index++){
+        player.inventory.consumables[index - 1] = player.inventory.consumables[index];
+        printf("%d\n", index);
+    }
+    player.inventory.consumables_amount--;
 }
 
 void inventory_run(){
@@ -1500,6 +1869,7 @@ void inventory_run(){
                 switch(marker_type){
                     case 0:
                         use_item(marker_index);
+                        uppdate_player_stats();
                         break;
                     case 1:
                         use_spel(marker_index);
@@ -1575,7 +1945,7 @@ int move_player(){
     }
 
     if(map_mode == map_normal){
-        if(map2[player.x + spatern_x[dir]][player.y + spatern_y[dir]] != 0 && !(map2[player.x + spatern_x[dir]][player.y + spatern_y[dir]] & bolt_flag)){
+        if(map2[player.x + spatern_x[dir]][player.y + spatern_y[dir]] != 0 && !(map2[player.x + spatern_x[dir]][player.y + spatern_y[dir]] & all_flages)){
             int i;
             for(i = 0; i < aktive_enemies; i++){
                 if(enemies[i].x == player.x + spatern_x[dir] && enemies[i].y == player.y + spatern_y[dir] && enemies[i].hp > 0){
@@ -1585,13 +1955,31 @@ int move_player(){
             enemies[i].hp -= player.damage;
             if(enemies[i].hp <= 0){
                 player.hp += 6;
-                map2[enemies[i].x][enemies[i].y] = 0;
+                kill_enemie(i);
             }
             uppdate = 1;
         }else if(!is_solid(player.x + spatern_x[dir], player.y + spatern_y[dir])){
             player.x += spatern_x[dir];
             player.y += spatern_y[dir];
             uppdate = 1;
+
+            if(map2[player.x][player.y] & consumables_flag){
+                if(player.inventory.consumables_amount < max_items){
+                    int i = player.inventory.consumables_amount;
+                    int j = map2[player.x][player.y] & ~all_flages;
+                    player.inventory.consumables[i] = consumables[j];
+                    consumables[j] = (consumables_t){ 0 };
+                    player.inventory.consumables_amount++;
+                }
+            }else if(map2[player.x][player.y] & item_flag){
+                if(player.inventory.items_amount < max_items){
+                    int i = player.inventory.items_amount;
+                    int j = map2[player.x][player.y] & ~all_flages;
+                    player.inventory.items[i] = items[j];
+                    items[j] = (items_t){ 0 };
+                    player.inventory.items_amount++;
+                }
+            }
         }
 
         //world movment
@@ -1732,6 +2120,11 @@ int main(){
 
     setlocale(LC_ALL, "en_US.UTF-8");
 
+    for(int i = 0; i < 7; i++){
+        player.equipment[i] = -1;
+    }
+    uppdate_player_stats();
+
     world_map_gen();
 
     map_gen();
@@ -1763,6 +2156,7 @@ int main(){
                 bolt_uppdate();
                 explotion();
             }
+            plase_items();
             draw_map();
             printf("\x1b[f");
         }
