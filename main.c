@@ -95,6 +95,7 @@ typedef struct{
 typedef struct{
     char name[32];
     int type;
+    int cost;
 }spels_t;
 
 typedef struct{
@@ -126,6 +127,9 @@ typedef struct{
     int dir;
     int x;
     int y;
+    int last_x;
+    int last_y;
+    int inaktivity;
     inventory_t inventory;
     int equipment[7]; 
 }player_t;
@@ -187,7 +191,26 @@ int map_mode = 0;
 
 world_tile_t world_map[world_width][world_height];
 
-player_t player = {.damage = 2, .hp = 20, .inventory = {.spels[0] = {.name = "Fierball"}, .spels_amount = 1}};
+char* item_names[] = {
+    "Sword          ",  //  0
+    "Shield         ", 
+    "Greatsword     ", 
+    "Warhammer      ", 
+    "Plait mail     ", 
+    "Chain mail     ",  //  5
+    "Mage robe      ", 
+    "Boots          ", 
+    "Helmet         ", 
+    "Pointy hat     ", 
+    "Healing ring   ",  // 10
+    "Magic ring     ", 
+    "Ring of Defense", 
+    "Ring of Offense",
+    "Wooden sword.  "
+};
+char* consumabals_names[] = {"Stake", "Potion", "Soup", "Scrolls"};
+
+player_t player = {.damage = 2, .hp = 20, .inventory = {.spels[0] = {.name = "Fierball", .type = 0, .cost = 5}, .spels_amount = 1}};
 
 enemies_t enemies[100];
 int aktive_enemies;
@@ -205,23 +228,6 @@ bolt_t bolts[max_bolts];
 
 items_t items[max_items];
 consumables_t consumables[max_items];
-
-char* item_names[] = {
-    "Sword          ",
-    "Shield         ", 
-    "Greatsword     ", 
-    "Warhammer      ", 
-    "Plait mail     ", 
-    "Chain mail     ", 
-    "Mage robe      ", 
-    "Boots          ", 
-    "Helmet         ", 
-    "Pointy hat     ", 
-    "Healing ring   ", 
-    "Magic ring     ", 
-    "Ring of Defense", 
-    "Ring of Offense"};
-char* consumabals_names[] = {"Stake", "Potion", "Soup", "Scrolls"};
 
 int spatern_x[] = {-1,  1,  0,  0, -1,  1, -1,  1};
 int spatern_y[] = { 0,  0, -1,  1, -1, -1,  1,  1};
@@ -873,11 +879,11 @@ void map_gen(){
 // enemy movment
 void kill_enemie(int i){
     map2[enemies[i].x][enemies[i].y] = 0;
-    if(rand() % 3 && 0){
+    if(rand() % 3){
         return;
     }
     int value = rand() % 15 + 2;
-    if(rand() % 2 && 0){
+    if(rand() % 2){
         int temp[2];
         int first = rand() % 2;
         temp[first] = rand() % value;
@@ -1561,9 +1567,10 @@ void draw_inventory(int type, int index){
         if(type == 1 && index == i){
             printf("\x1b[31m");
         }
-        printf("%2d: %s\x1b[0m\n", i + 1, player.inventory.spels[i].name);
+        printf("%2d: %s (%d)\x1b[0m\n", i + 1, player.inventory.spels[i].name, player.inventory.spels[i].cost);
 
     }
+
     printf("\nConsumables:\n");
     for(int i = 0; i < player.inventory.consumables_amount; i++){
         if(type == 2 && index == i){
@@ -1691,7 +1698,11 @@ void remove_item(int i){
     player.inventory.items_amount--;
 }
 
-void use_spel(int index){
+int use_spel(int index){
+    if(player.inventory.spels[index].cost > player.mp){
+        return 0;
+    }
+    player.mp -= player.inventory.spels[index].cost;
     int mode = 1;
     int target_x = player.x;
     int target_y = player.y;
@@ -1746,7 +1757,7 @@ void use_spel(int index){
 
                 case 'e':
                 case 'E':
-                    return;
+                    return 0;
 
                 case 'm':
                 case 'M':
@@ -1787,7 +1798,7 @@ void use_spel(int index){
 
                 case 'e':
                 case 'E':
-                    return;
+                    return 0;
 
                 case 'm':
                 case 'M':
@@ -1822,6 +1833,7 @@ void use_spel(int index){
             bolt_spawn(player.x , player.y, dir_x, dir_y, player.damage);
         }break;
     }
+    return 1;
 }
 
 void use_consumables(int index){
@@ -1934,7 +1946,9 @@ void inventory_run(){
                         uppdate_player_stats();
                         break;
                     case 1:
-                        use_spel(marker_index);
+                        if(!use_spel(marker_index)){
+                            inventory_run();
+                        }
                         break;
                     case 2:
                         use_consumables(marker_index);
@@ -2019,7 +2033,6 @@ int move_player(){
             }
             enemies[i].hp -= player.damage;
             if(enemies[i].hp <= 0){
-                player.hp += 6;
                 kill_enemie(i);
             }
             uppdate = 1;
@@ -2071,6 +2084,39 @@ int move_player(){
     }
 
     return uppdate;
+}
+
+void regeneration(){
+    if(player.x == player.last_x && player.y == player.last_y){
+        player.inaktivity++;
+    }else{
+        player.inaktivity = 0;
+    }
+
+    for(int i = 0; i < search_cross; i++){
+        if(map2[player.x + spatern_x[i]][player.y + spatern_y[i]] && !(map2[player.x + spatern_x[i]][player.y + spatern_y[i]] & all_flages)){
+            player.inaktivity = 0;
+            break;
+        }
+    }
+
+    if(map4[player.x][player.y]){
+        player.inaktivity = 0;
+    }
+
+    if(player.inaktivity > 2){
+        player.hp += player.hp_regen;
+        player.mp += player.mp_regen;
+
+        if(player.hp > player.max_hp){
+            player.hp = player.max_hp;
+        }
+        if(player.mp > player.max_mp){
+            player.mp = player.max_mp;
+        }
+    }
+    player.last_x = player.x;
+    player.last_y = player.y;
 }
 
 //visebilytty 
@@ -2188,6 +2234,11 @@ int main(){
     for(int i = 0; i < 7; i++){
         player.equipment[i] = -1;
     }
+
+    player.inventory.items[0] = (items_t){.attack = 1, .name = item_names[14], .slots = 1};
+    player.inventory.items_amount = 1;
+    player.equipment[0] = 0;
+
     uppdate_player_stats();
 
     world_map_gen();
@@ -2219,6 +2270,7 @@ int main(){
                 }
                 enemies_uppdete();
                 bolt_uppdate();
+                regeneration();
                 explotion();
             }
             plase_items();
