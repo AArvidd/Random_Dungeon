@@ -236,6 +236,28 @@ queue_t queue = {
     .next_empty = 0
 };
 
+int conformation(char string[]){
+    while(1){    
+        printf("\x1b[1;1H\x1b[2J");
+        printf("Do you want to %s? (y/n): ", string);
+        char c;
+        while((c = getchar()) == '\n');
+        switch(c){
+            case 'y':
+            case 'Y':{
+                printf("\x1b[1;1H\x1b[2J");
+                return 1;
+            }break;
+
+            case 'n':
+            case 'N':{
+                printf("\x1b[1;1H\x1b[2J");
+                return 0;
+            }break;
+        }
+    }
+}
+
 int is_solid(int x, int y){
     if( map1[x][y] == tile_rock     ||
         map1[x][y] == tile_hardrock ||
@@ -1561,6 +1583,13 @@ void draw_inventory(int type, int index){
         printf(")\x1b[0m\n");
 
     }
+
+    printf("\nNavigate W, S,   ");
+    if(type == 0){
+        printf("Drop item D");
+    }
+    printf("\n");
+
 }
 
 void uppdate_player_stats(){
@@ -1647,6 +1676,19 @@ void use_item(int index){
             player.equipment[i] = index;
         }
     }
+}
+
+void remove_item(int i){
+    for(int j = 0; j < 7; j++){
+        if(player.equipment[j] > i){
+            player.equipment[j]--;
+        }
+    }
+
+    for(i++; i < inventory_size; i++){
+        player.inventory.items[i - 1] = player.inventory.items[i];
+    }
+    player.inventory.items_amount--;
 }
 
 void use_spel(int index){
@@ -1865,6 +1907,26 @@ void inventory_run(){
                 }
             }break;
 
+            case 'd':
+            case 'D':{
+                if(marker_type != 0){
+                    break;
+                }
+                int exit = 0;
+                for(int i = 0; i < 7; i++){
+                    if(player.equipment[i] == marker_index){
+                        exit = 1;
+                    }
+                }
+                if(exit){
+                    break;
+                }
+                if(conformation("remove this item")){
+                    remove_item(marker_index);
+                    return;
+                }
+            }break;
+
             case '\n':
                 switch(marker_type){
                     case 0:
@@ -1919,7 +1981,10 @@ int move_player(){
 
         case 'e':
         case 'E':
-            return -1;
+            if(conformation("exit the game")){
+                return -1;
+            }
+            return 0;
         
         case ' ':
             return 1;
