@@ -63,6 +63,7 @@ typedef enum{
     map_world,
 }mape_modes_e;
 
+
 typedef struct{
     int curent;
     int next_empty;
@@ -206,7 +207,7 @@ char* item_names[] = {
     "Magic ring     ", 
     "Ring of Defense", 
     "Ring of Offense",
-    "Wooden sword.  "
+    "Wooden sword   "
 };
 char* consumabals_names[] = {"Stake", "Potion", "Soup", "Scrolls"};
 
@@ -242,7 +243,7 @@ queue_t queue = {
     .next_empty = 0
 };
 
-int conformation(char string[]){
+int conformation(char string[]){ // function to conferm whit player
     while(1){    
         printf("\x1b[1;1H\x1b[2J");
         printf("Do you want to %s? (y/n): ", string);
@@ -264,7 +265,7 @@ int conformation(char string[]){
     }
 }
 
-int is_solid(int x, int y){
+int is_solid(int x, int y){ // cheks if tile x y is solid ore out of bounds
     if( map1[x][y] == tile_rock     ||
         map1[x][y] == tile_hardrock ||
         map1[x][y] == tile_wall     ||
@@ -277,10 +278,10 @@ int is_solid(int x, int y){
 }
 
 //world map generation
-void hunt_and_kill(int current_x, int current_y){
+void hunt_and_kill(int current_x, int current_y){ // generates a path in world map generation
     while(1){
         world_map[current_x][current_y].viseted = 1;
-        int dir = rand() % 4;
+        int dir = rand() % search_cross; // selects a direction 
 
         int tests = 0;
         while(1){
@@ -289,7 +290,7 @@ void hunt_and_kill(int current_x, int current_y){
                 current_y + spatern_y[dir] < 0 || current_y + spatern_y[dir] > world_height - 1
             ){
                 tests++;
-                if(tests == 4){
+                if(tests == 4){ // exit if no path forward
                     return;
                 }
                 dir++;
@@ -301,12 +302,12 @@ void hunt_and_kill(int current_x, int current_y){
             break;
         }
 
-        world_map[current_x][current_y].conection |= 1 << dir;
+        world_map[current_x][current_y].conection |= 1 << dir; // conects curent position to next position
 
         current_x += spatern_x[dir];
         current_y += spatern_y[dir];
 
-        switch(dir){
+        switch(dir){ // conects next position to curent position
             case 0:
                 world_map[current_x][current_y].conection |= 1 << 1;
                 break;
@@ -323,16 +324,16 @@ void hunt_and_kill(int current_x, int current_y){
     }
 }
 
-void world_map_gen(){
+void world_map_gen(){ // generates the world map
     srand(time(NULL));
     for(int y = 0; y < world_height; y++){
         for(int x = 0; x < world_width; x++){
-            for(int i = 0; i < 4; i++){
+            for(int i = 0; i < 4; i++){ // sertches for a position whid unvisited nabors
                 if(!world_map[x + spatern_x[i]][y + spatern_y[i]].viseted && !(
                     x + spatern_x[i] < 0 || x + spatern_x[i] > world_width - 1 ||
                     y + spatern_y[i] < 0 || y + spatern_y[i] > world_height - 1
                 )){
-                    hunt_and_kill(x, y);
+                    hunt_and_kill(x, y); // generate peth and reset
                     x = 0;
                     y = 0;
                     break;
@@ -340,19 +341,19 @@ void world_map_gen(){
             }
         }
     }
-    world_pos_x = rand() % world_width;
+    world_pos_x = rand() % world_width; // puts down player
     world_pos_y = rand() % world_height;
 }
 
 //map generation
-int flood_search(int x, int y, int marker){
+int flood_search(int x, int y, int marker){ // markes all plases whid a conection to eatch other and retuns how menny positions are conected
     int area = 1;
     queue.queue_x[0] = x;
     queue.queue_y[0] = y;
     queue.next_empty++;
-    map2[x][y] = 1;
+    map2[x][y] = marker;
     while(queue.curent != queue.next_empty){
-        for(int i = 0; i < search_cross; i++){
+        for(int i = 0; i < search_cross; i++){ // cheks the curent squars nabors
             if((
                 map1[queue.queue_x[queue.curent] + spatern_x[i]][queue.queue_y[queue.curent] + spatern_y[i]] == tile_floor || 
                 map1[queue.queue_x[queue.curent] + spatern_x[i]][queue.queue_y[queue.curent] + spatern_y[i]] == tile_door) && 
@@ -360,7 +361,7 @@ int flood_search(int x, int y, int marker){
             ){
                 map2[queue.queue_x[queue.curent] + spatern_x[i]][queue.queue_y[queue.curent] + spatern_y[i]] = marker;
                 area++;
-                queue.queue_x[queue.next_empty] = queue.queue_x[queue.curent] + spatern_x[i];
+                queue.queue_x[queue.next_empty] = queue.queue_x[queue.curent] + spatern_x[i]; //adds a empty unvisited nabor to the queue
                 queue.queue_y[queue.next_empty] = queue.queue_y[queue.curent] + spatern_y[i];
                 queue.next_empty++;
                 if(queue.next_empty == queue_lenth){
@@ -369,7 +370,7 @@ int flood_search(int x, int y, int marker){
 
             }
         }
-        queue.queue_x[queue.curent] = 0;
+        queue.queue_x[queue.curent] = 0; // removes the curent position from the queue
         queue.queue_y[queue.curent] = 0;
         queue.curent++;
         if(queue.curent == queue_lenth){
@@ -381,7 +382,7 @@ int flood_search(int x, int y, int marker){
     return area;
 }
 
-void flood_remove(int x, int y){
+void flood_remove(int x, int y){ // simelar to flood_search but markes all viseted positions as rock
     queue.queue_x[0] = x;
     queue.queue_y[0] = y;
     queue.next_empty++;
@@ -410,11 +411,11 @@ void flood_remove(int x, int y){
     queue.next_empty = 0;
 }
 
-void add_hardrock(){
+void add_hardrock(){ // makes all tiles that are surounded in a 7 X 7 aria of solid tiles to hard rock
     for(int x = 0; x < width; x++){
         for(int y = 0; y < height; y++){
 
-            if(map1[x][y] == 0){
+            if(!is_solid(x, y)){
                 continue;
             }
 
@@ -442,18 +443,18 @@ void add_hardrock(){
     }
 }
 
-void coredor_gen(int from_x, int from_y, int to_x, int to_y){
+void coredor_gen(int from_x, int from_y, int to_x, int to_y){ // generates a coridor betwean two points on the map
 
-    int moledir_x = to_x - from_x;
+    int moledir_x = to_x - from_x; // determen the direction to travel
     int moledir_y = to_y - from_y;
 
-    if(moledir_x < 0){
+    if(moledir_x < 0){ // clamp x direction
         moledir_x = -1;
     }else if(moledir_x > 0){
         moledir_x = 1;
     }
 
-    if(moledir_y < 0){
+    if(moledir_y < 0){ // clap y direction 
         moledir_y = -1;
     }else if(moledir_y > 0){
         moledir_y = 1;
@@ -466,27 +467,27 @@ void coredor_gen(int from_x, int from_y, int to_x, int to_y){
         int oldest_y = olde_y;
         olde_x = from_x;
         olde_y = from_y;
-        if(from_x != to_x){
+        if(from_x != to_x){ // move 
             from_x += moledir_x;
         } else{
             from_y += moledir_y;
         }
 
-        if(map1[from_x][from_y] == tile_wall || map1[from_x][from_y] == tile_door){
+        if(map1[from_x][from_y] == tile_wall || map1[from_x][from_y] == tile_door){ // convert curent tile to floor ore door
             map1[from_x][from_y] = tile_door;
         }else{
             map1[from_x][from_y] = tile_floor;
         }
 
         for(int i = 0; i < search_full; i++){
-            if(map1[oldest_x + spatern_x[i]][oldest_y + spatern_y[i]] == tile_rock){
+            if(map1[oldest_x + spatern_x[i]][oldest_y + spatern_y[i]] == tile_rock){ // converts all tiles around two steps back to wall
                 map1[oldest_x + spatern_x[i]][oldest_y + spatern_y[i]] = tile_wall;
             }
         }
     }
 }
 
-void tunel_gen(int from_x, int from_y, int direction){
+void tunel_gen(int from_x, int from_y, int direction){ // generates a tunel to a floor
     while(map1[from_x][from_y] != tile_floor){
         map1[from_x][from_y] = tile_floor;
         from_x += spatern_x[direction];
@@ -495,7 +496,7 @@ void tunel_gen(int from_x, int from_y, int direction){
 
 }
 
-void cave_gen(int acces){
+void cave_gen(int acces){ // generates the cave arias using a selular atameta
     //initial sead
     for(int x = 0; x < width; x++){
         for(int y = 0; y < height; y++){
@@ -589,7 +590,7 @@ void cave_gen(int acces){
         flood_remove(remove_x[i], remove_y[i]);
     }
 
-    for(int i = 0; i < keep; i++){
+    for(int i = 0; i < keep; i++){ // conect disconected arias
         if(i == largest_id){
             continue;
         }
@@ -663,7 +664,7 @@ void cave_gen(int acces){
 
 }
 
-void dungeon_gen(int acces){
+void dungeon_gen(int acces){ // generates the dungeon arias
     //room generation
 
     for(int x = 0; x <width + 1; x++){
@@ -830,7 +831,7 @@ void dungeon_gen(int acces){
 
 }
 
-void enemies_gen(){
+void enemies_gen(){ // generates the enemies and plases them out
     aktive_enemies = 0;
     for(int i = 0; i < 20; i++){
         int x = rand() % width;
@@ -848,7 +849,7 @@ void enemies_gen(){
     }
 }
 
-void plase_player(){
+void plase_player(){ // plases the player on a random spot in the first map
     player.x = rand() % width;
     player.y = rand() % height;
     while(map1[player.x][player.y] != 0){
@@ -857,12 +858,12 @@ void plase_player(){
     }
 }
 
-void map_gen(){
-    if(world_map[world_pos_x][world_pos_y].sead == 0){
+void map_gen(){ // generates the map
+    if(world_map[world_pos_x][world_pos_y].sead == 0){ // gets the sead
         world_map[world_pos_x][world_pos_y].sead = time(NULL);
     }
-    srand(world_map[world_pos_x][world_pos_y].sead);
-    if(rand() % 2){
+    srand(world_map[world_pos_x][world_pos_y].sead); // sert teh sead
+    if(rand() % 2){ // chouses type
         dungeon_gen(world_map[world_pos_x][world_pos_y].conection);
     }else{
         cave_gen(world_map[world_pos_x][world_pos_y].conection);
@@ -877,18 +878,18 @@ void map_gen(){
 }
 
 // enemy movment
-void kill_enemie(int i){
+void kill_enemie(int i){ // kiles the enemy and generates an item ore consumebal
     map2[enemies[i].x][enemies[i].y] = 0;
     if(rand() % 3){
         return;
     }
     int value = rand() % 15 + 2;
-    if(rand() % 2){
+    if(rand() % 2){ // consumebal generation
         int temp[2];
         int first = rand() % 2;
         temp[first] = rand() % value;
         value -= temp[first];
-        temp[!first] = rand() % value;
+        temp[!first] = rand() % value; // first is only 0 ore 1 and !first takes the oposit of first
 
         consumables_t consumables_temp = {.hp = temp[0], .mp = temp[1], .name = consumabals_names[rand() % 4], .x = enemies[i].x, .y = enemies[i].y};
 
@@ -900,7 +901,7 @@ void kill_enemie(int i){
             }
         }
 
-    }else{
+    }else{ // item generation
         int slots = 0;
         int hp = 0;
         int hp_regen = 0;
@@ -1007,7 +1008,7 @@ void kill_enemie(int i){
     }
 }
 
-float distens(int x1, int y1, int x2, int y2){
+float distens(int x1, int y1, int x2, int y2){ // calculates teh distens betvean two tiles
     int x = x1 - x2;
     int y = y1 - y2;
 
@@ -1017,7 +1018,7 @@ float distens(int x1, int y1, int x2, int y2){
     return sqrt(x + y);
 }
 
-void bolt_spawn(int x, int y, int dir_x, int dir_y, int damage){
+void bolt_spawn(int x, int y, int dir_x, int dir_y, int damage){ // spawns a bolt
     for(int i = 0; i < max_bolts; i++){
         if(bolts[i].damage == 0){
             bolts[i] = (bolt_t){.x = x, .y = y, .dir_x = dir_x, .dir_y = dir_y, .damage = damage};
@@ -1026,7 +1027,7 @@ void bolt_spawn(int x, int y, int dir_x, int dir_y, int damage){
     }
 }
 
-void bolt_uppdate(){
+void bolt_uppdate(){ // uppdates all aktive bolts 
     for(int i = 0; i < max_bolts; i++){
         if(bolts[i].damage == 0){
             continue;
@@ -1050,7 +1051,7 @@ void bolt_uppdate(){
             bolts[i].damage = 0;
         }
 
-        for(; n > 0; --n){
+        for(; n > 0; --n){ // move the bolt one tile at a time
             if(error > 0){
                 bolts[i].x += x_inc;
                 error -= dy;
@@ -1065,7 +1066,7 @@ void bolt_uppdate(){
                 --n;
             }
 
-            if(is_solid(bolts[i].x, bolts[i].y) || map1[bolts[i].x][bolts[i].y] == tile_door){
+            if(is_solid(bolts[i].x, bolts[i].y) || map1[bolts[i].x][bolts[i].y] == tile_door){ // colition
                 bolts[i].damage = 0;
             }else if(map2[bolts[i].x][bolts[i].y]){
                 for(int j = 0; j < aktive_enemies; j++){
@@ -1082,7 +1083,7 @@ void bolt_uppdate(){
                 player.hp -= bolts[i].damage;
                 bolts[i].damage = 0;
             }
-            if(bolts[i].damage == 0){
+            if(bolts[i].damage == 0){ // generates the explotion of bolte colided
                 for(int x = -4; x < 5; x++){
                     for(int y = -4; y < 5; y++){
                         if(distens(bolts[i].x, bolts[i].y, bolts[i].x + x, bolts[i].y + y) < (random() % 4) + 1){
@@ -1099,7 +1100,7 @@ void bolt_uppdate(){
     }
 }
 
-void explotion(){
+void explotion(){ // function fore explotion so that all enetetie and tiles are efected
     for(int x = 0; x < width; x++){
         for(int y = 0; y < height; y++){
             if(map4[x][y]){
@@ -1109,8 +1110,11 @@ void explotion(){
                 if(map2[x][y] && !(map2[x][y] & all_flages)){
 
                     for(int i = 0; i < aktive_enemies; i++){
-                        if(enemies[i].x == x && enemies[i].y == y){
+                        if(enemies[i].x == x && enemies[i].y == y && enemies[i].hp != 0){
                             enemies[i].hp--;
+                            if(enemies[i].hp == 0){
+                                kill_enemie(i);
+                            }
                             break;
                         }
                     }
@@ -1123,7 +1127,7 @@ void explotion(){
     }
 }
 
-void enemies_pathfinding(int i){
+void enemies_pathfinding(int i){ // path findin fore enemies usin a* 
     int no_path = 0;
     for(int j = 0; j < queue_lenth; j++){
         queue.queue_x[j] = -1;
@@ -1138,7 +1142,6 @@ void enemies_pathfinding(int i){
     queue.queue_x[0] = enemies[i].x;
     queue.queue_y[0] = enemies[i].y;
     map4[enemies[i].x][enemies[i].y] = 0;
-    // queue.next_empty++;
 
     while(1){
 
@@ -1169,12 +1172,12 @@ void enemies_pathfinding(int i){
                 goto exit;
             }
 
-            // int g = map4[queue.queue_x[next]][queue.queue_y[next]] + 1;
+            // int g = map4[queue.queue_x[next]][queue.queue_y[next]] + 1; // oled coad kept fore futer use
             int g = 0;
             float h = distens(queue.queue_x[next] + enemies_types[enemies[i].type].movement_x[j], queue.queue_y[next] + enemies_types[enemies[i].type].movement_y[j], enemies[i].to_x, enemies[i].to_y);
             int f = (g + (int)ceil(h)) << 3;
 
-            if(/* f >= (map4[queue.queue_x[next] + enemies_types[enemies[i].type].movement_x[j]][queue.queue_y[next] + enemies_types[enemies[i].type].movement_y[j]] & ~3) &&  */
+            if(/* f >= (map4[queue.queue_x[next] + enemies_types[enemies[i].type].movement_x[j]][queue.queue_y[next] + enemies_types[enemies[i].type].movement_y[j]] & ~3) &&  */ // oled coad kepf tore futer use
                 map4[queue.queue_x[next] + enemies_types[enemies[i].type].movement_x[j]][queue.queue_y[next] + enemies_types[enemies[i].type].movement_y[j]] != -1
             ){
                 continue;
@@ -1224,7 +1227,7 @@ void enemies_pathfinding(int i){
 
 }
 
-void enemies_uppdete(){
+void enemies_uppdete(){ // updates all alive enemies
 
     for(int x = 0; x < width; x++){
         for(int y = 0; y < height; y++){
@@ -1232,7 +1235,7 @@ void enemies_uppdete(){
         }
     }
 
-    for(int i = 0; i < aktive_enemies; i++){
+    for(int i = 0; i < aktive_enemies; i++){ // plases the enemies down before movment to make sure two enemies dont exist on teh same tile
         if(enemies[i].hp > 0){
             map2[enemies[i].x][enemies[i].y] = enemies[i].type;
         }
@@ -1243,7 +1246,7 @@ void enemies_uppdete(){
             continue;
         }
         map2[enemies[i].x][enemies[i].y] = 0;
-        if(map3[enemies[i].x][enemies[i].y] == 1 || enemies[i].seen){
+        if(map3[enemies[i].x][enemies[i].y] == 1 || enemies[i].seen){ // if the player seas the enemi, path fine toeard player
             enemies[i].to_x = player.x;
             enemies[i].to_y = player.y;
             enemies_pathfinding(i);
@@ -1257,7 +1260,7 @@ void enemies_uppdete(){
             if(enemies[i].movment == 0){
                 enemies[i].movment = enemies_types[enemies[i].type].spead;
 
-                if(enemies[i].type == wizard){
+                if(enemies[i].type == wizard){ // code for teh wizard
                     if(map3[enemies[i].x][enemies[i].y] == 1 && 100/(distens(enemies[i].x, enemies[i].y, player.x, player.y) / 2) > random() % 40 + 1){
                         float disten = distens(enemies[i].x, enemies[i].y, player.x, player.y);
                         float dir_x = (player.x - enemies[i].x) / disten;
@@ -1268,14 +1271,15 @@ void enemies_uppdete(){
                         dir_y = round(dir_y);
                         bolt_spawn(enemies[i].x , enemies[i].y, dir_x, dir_y, enemies_types[enemies[i].type].damage);
 
-                    }else if(map2[enemies[i].path_x[enemies[i].steps]][enemies[i].path_y[enemies[i].steps]] && !(map2[enemies[i].path_x[enemies[i].steps]][enemies[i].path_y[enemies[i].steps]] & all_flages)){
+                    }else if(map2[enemies[i].path_x[enemies[i].steps]][enemies[i].path_y[enemies[i].steps]] && !(map2[enemies[i].path_x[enemies[i].steps]][enemies[i].path_y[enemies[i].steps]] & all_flages)){ 
+                        // if the enemies next step is blocked by another enemy
                         enemies_pathfinding(i);
                     }else{
                         enemies[i].x = enemies[i].path_x[enemies[i].steps];
                         enemies[i].y = enemies[i].path_y[enemies[i].steps];
                         enemies[i].steps--;
                     }
-                }else{
+                }else{ // every one else
                     if(enemies[i].path_x[enemies[i].steps] == player.x && enemies[i].path_y[enemies[i].steps] == player.y){
                         int damage = enemies_types[enemies[i].type].damage - player.defense;
                         if(damage < 1){
@@ -1283,6 +1287,7 @@ void enemies_uppdete(){
                         }
                         player.hp -= damage;
                     }else if(map2[enemies[i].path_x[enemies[i].steps]][enemies[i].path_y[enemies[i].steps]] && !(map2[enemies[i].path_x[enemies[i].steps]][enemies[i].path_y[enemies[i].steps]] & all_flages)){
+                        // if the enemies next step is blocked by another enemy
                         enemies_pathfinding(i);
                     }else{
                         enemies[i].x = enemies[i].path_x[enemies[i].steps];
@@ -1294,16 +1299,12 @@ void enemies_uppdete(){
                 enemies[i].movment--;
             }
         }
-        if(map2[enemies[i].x][enemies[i].y]){
-            map4[enemies[i].x][enemies[i].y] = 2;
-        }
         map2[enemies[i].x][enemies[i].y] = enemies[i].type;
-
     }
 }
 
 // map render
-void plase_items(){
+void plase_items(){ // plases teh items on the grownd to be drawn
     for(int i = 0; i < max_items; i++){
         if(items[i].aktive){
             map2[items[i].x][items[i].y] = i | item_flag;
@@ -1314,7 +1315,7 @@ void plase_items(){
     }
 }
 
-void draw_wall(int x, int y){
+void draw_wall(int x, int y){ // draws walls the corect way depending on its nabors
     int type = 0;
 
     for(int i = 0; i < search_cross; i++){
@@ -1339,7 +1340,7 @@ void draw_wall(int x, int y){
     
 }
 
-void draw_tile(int x, int y){
+void draw_tile(int x, int y){ // draws the tile at position x y
     switch(map1[x][y]){
         case tile_floor:
             if(full_bright){
@@ -1368,7 +1369,7 @@ void draw_tile(int x, int y){
     }
 }
 
-void draw_enemie(int i){
+void draw_enemie(int i){ // draws the enemy at position x y
     printf(" ");
     switch(i){
         case goblin:
@@ -1394,11 +1395,12 @@ void draw_enemie(int i){
     printf(" \e[0m");
 }
 
-void draw_bolt(int x, int y){
+void draw_bolt(int x, int y){ // draws the bolt at posistion x y
 
     printf(" \e[33mo\e[0m ");
 
-    // int i = 0;
+    // oald code ment to be rewriten to make the bolt be drawn difrently depending on derection of travel
+    // int i = 0; 
     // for(; i < max_bolts; i++){
     //     if(bolts[i].x == x && bolts[i].y == y){
     //         break;
@@ -1406,13 +1408,10 @@ void draw_bolt(int x, int y){
     // }
 
     // float angle = atan2(bolts[i].dir_x, bolts[i].dir_y);
-
-   
-
 }
 
-void draw_map(){
-    if(map_mode == map_normal){
+void draw_map(){ // draws the map and player information
+    if(map_mode == map_normal){ // normal map
         printf("       ");
         for(int x = 0; x < width; x++){
             printf("%2d ", x);
@@ -1457,7 +1456,7 @@ void draw_map(){
         printf("   Damage = %2d   Defense = %2d", player.damage, player.defense);
         printf("\n");
 
-    }else if(map_mode == map_world){
+    }else if(map_mode == map_world){ // world map
         printf("world pos: %d, %d\n", world_pos_x, world_pos_y);
         for(int y = 0; y < world_height; y++){
             printf("y: %2d ", y);
@@ -1482,7 +1481,7 @@ void draw_map(){
 
 }
 
-void clear_information(){
+void clear_information(){ // cleans upp map 3 and 4 fore next cykel
     for(int x = 0; x < width; x++){
         for(int y = 0; y < height; y++){
             map3[x][y] = 0;
@@ -1492,7 +1491,7 @@ void clear_information(){
 }
 
 // player
-void draw_inventory(int type, int index){
+void draw_inventory(int type, int index){ // draws the inventory
     printf("\x1b[1;1H\x1b[2J");
     printf("Items:\n");
     for(int i = 0; i < player.inventory.items_amount; i++){
@@ -1599,7 +1598,7 @@ void draw_inventory(int type, int index){
 
 }
 
-void uppdate_player_stats(){
+void uppdate_player_stats(){ // uppdates the players statistics depending on items equiped
     player.max_hp = 10;
     player.max_mp = 0;
     player.hp_regen = 0;
@@ -1638,7 +1637,7 @@ void uppdate_player_stats(){
 
 }
 
-void use_item(int index){
+void use_item(int index){ // equips / un equips items
     items_t item_temp = player.inventory.items[index];
 
     int exit = 0;
@@ -1685,7 +1684,7 @@ void use_item(int index){
     }
 }
 
-void remove_item(int i){
+void remove_item(int i){ // diskardes a item
     for(int j = 0; j < 7; j++){
         if(player.equipment[j] > i){
             player.equipment[j]--;
@@ -1698,7 +1697,7 @@ void remove_item(int i){
     player.inventory.items_amount--;
 }
 
-int use_spel(int index){
+int use_spel(int index){ // uses a spell
     if(player.inventory.spels[index].cost > player.mp){
         return 0;
     }
@@ -1708,13 +1707,13 @@ int use_spel(int index){
     int target_y = player.y;
     int i = 0;
     begining:;
-    if(mode){
-        for(; i <= aktive_enemies; i++){
+    if(mode){ // automatic targeting
+        for(; i <= aktive_enemies; i++){ // findes the first enemy thats is sean by the player and alive
             if(map3[enemies[i].x][enemies[i].y] && enemies[i].hp > 0){
                 map4[enemies[i].x][enemies[i].y] = 2;
                 break;
             }
-            if(i == aktive_enemies){
+            if(i == aktive_enemies){ // if none found go to manual mode
                 mode = 0;
                 goto begining;
             }
@@ -1766,7 +1765,7 @@ int use_spel(int index){
                     goto begining;
             }
         }
-    }else{
+    }else{ // manual targeting
         while(1){
             printf("\x1b[f");
             draw_map();
@@ -1822,7 +1821,7 @@ int use_spel(int index){
     exit:;
 
     switch(player.inventory.spels[index].type){
-        case 0:{
+        case 0:{ // fierball
             float disten = distens(target_x, target_y, player.x, player.y);
             float dir_x = (target_x - player.x) / disten;
             float dir_y = (target_y - player.y) / disten;
@@ -1836,7 +1835,7 @@ int use_spel(int index){
     return 1;
 }
 
-void use_consumables(int index){
+void use_consumables(int index){ // uses and removes a consumabal
     player.hp += player.inventory.consumables[index].hp;
     player.mp += player.inventory.consumables[index].mp;
 
@@ -1855,7 +1854,7 @@ void use_consumables(int index){
     player.inventory.consumables_amount--;
 }
 
-void inventory_run(){
+void inventory_run(){  // runs the inventory
     int marker_type = 0;
     int marker_index = 0;
     if(player.inventory.items_amount == 0){
@@ -1965,7 +1964,7 @@ void inventory_run(){
     }
 }
 
-int move_player(){
+int move_player(){ // player movment and input
     //map movment
     int uppdate = 0;
     char c;
@@ -2086,7 +2085,7 @@ int move_player(){
     return uppdate;
 }
 
-void regeneration(){
+void regeneration(){ // regenerates the player 
     if(player.x == player.last_x && player.y == player.last_y){
         player.inaktivity++;
     }else{
@@ -2119,12 +2118,12 @@ void regeneration(){
     player.last_y = player.y;
 }
 
-//visebilytty 
+//visebilytty algoritmem based on https://www.albertford.com/shadowcasting/
 float slope(int x, int y){
     return (y - 0.5f) / x;
 }
 
-void transform(int x, int y, int* out_x, int* out_y){
+void transform(int x, int y, int* out_x, int* out_y){ // transform from relative position to absolute position
     switch(player.dir){
         case left:
             *out_x = player.x - x;
@@ -2145,7 +2144,7 @@ void transform(int x, int y, int* out_x, int* out_y){
     }
 }
 
-int tiles(ROW row, int* out_x, int* out_y){
+int tiles(ROW row, int* out_x, int* out_y){ // gets the tiles to run thru
     int min_col = floor((row.deapth * row.start_slope) + 0.5f);
     int max_col = ceil((row.deapth * row.end_slope) - 0.5f);
     for(int i = 0; i <= max_col - min_col; i++){
@@ -2155,7 +2154,7 @@ int tiles(ROW row, int* out_x, int* out_y){
     return max_col - min_col + 1;
 }
 
-void reveal_tile(int x, int y){
+void reveal_tile(int x, int y){ // markes a tile as visibal
     int true_x;
     int true_y;
 
@@ -2166,11 +2165,11 @@ void reveal_tile(int x, int y){
     map3[true_x][true_y] = 1;
 }
 
-int is_symmetric(ROW row, int x, int y){
+int is_symmetric(ROW row, int x, int y){ // ckeks if a tile can se the player
     return (y >= row.deapth * row.start_slope && y <= row.deapth * row.end_slope);
 }
 
-int get_tile(int x, int y){
+int get_tile(int x, int y){ // returns is a tile is opace ore transparent
     if(x == -1 && y == -1){
         return 0;
     }
@@ -2190,7 +2189,7 @@ int get_tile(int x, int y){
     return 0;
 }
 
-void scan(ROW row){
+void scan(ROW row){ // shadow casting algoritmem in one direction
     int tile_x[100];
     int tile_y[100];
 
@@ -2220,16 +2219,16 @@ void scan(ROW row){
 
 
 int main(){
-    printf("\x1b[?1049h");
+    printf("\x1b[?1049h"); // switches terminal
 
     static struct termios oldt, newt;
 
-    tcgetattr(STDIN_FILENO, &oldt);
+    tcgetattr(STDIN_FILENO, &oldt); // gets the terminal setings and changes the terminla to noncanonical mode so that enter dosen dead to be prest fore inputs to be read.
     newt = oldt;
     newt.c_lflag &= ~(ICANON);
     tcsetattr(STDIN_FILENO, TCSANOW, &newt);
 
-    setlocale(LC_ALL, "en_US.UTF-8");
+    setlocale(LC_ALL, "en_US.UTF-8"); // sets the carectar local to be able to draw the wall tiles
 
     for(int i = 0; i < 7; i++){
         player.equipment[i] = -1;
@@ -2247,8 +2246,8 @@ int main(){
 
     plase_player();
 
-    printf("\x1b[f");
-    for(int i = 0; i < search_cross; i++){
+    printf("\x1b[f"); // returns curset to teh upper left of the screan
+    for(int i = 0; i < search_cross; i++){ // shadowcasting in all. directins
         player.dir = i;
         ROW first_row = {.deapth = 1, .start_slope = -1, .end_slope = 1};
         scan(first_row);
@@ -2258,9 +2257,9 @@ int main(){
 
     while(player.hp > 0){
         int action = move_player();
-        if(action == -1){
+        if(action == -1){ //exit the game
             break;
-        }else if(action){
+        }else if(action){ // only uppdate everything if player has moved ore done something
             clear_information();
             if(map_mode == map_normal){
                 for(int i = 0; i < search_cross; i++){
@@ -2279,14 +2278,14 @@ int main(){
         }
     }
     if(player.hp <=0){
-        printf("\x1b[1;1H\e[2J\x1b[31mGame Over\x1b[0m\nPress enter to quit\n");
+        printf("\x1b[1;1H\e[2J\x1b[31mGame Over\x1b[0m\nPress enter to quit\n"); // \x1b[1;1H\e[2J clears teh screan
 
         while(getchar() != '\n');
     }
 
-    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt); // returns old terminal setings
 
-    printf("\x1b[?1049l");
+    printf("\x1b[?1049l"); // switches terminal back to first
 
     return 0;
 }
